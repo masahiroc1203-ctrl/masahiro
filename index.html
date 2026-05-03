@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>デスクトップ負荷モニター</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --card: #1a1d27;
+    --border: #2a2d3e;
+    --text: #e2e8f0;
+    --muted: #8892a4;
+    --green: #22c55e;
+    --yellow: #eab308;
+    --red: #ef4444;
+    --blue: #3b82f6;
+    --purple: #a855f7;
+    --cyan: #06b6d4;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; }
+
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 20px; background: var(--card); border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 10;
+  }
+  header h1 { font-size: 16px; font-weight: 600; letter-spacing: .5px; }
+  #timestamp { color: var(--muted); font-size: 12px; }
+  #status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); display: inline-block; margin-right: 6px; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+  main { padding: 16px; display: grid; gap: 16px; max-width: 1400px; margin: 0 auto; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  @media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } .grid-4 { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 500px) { .grid-4 { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px;
+  }
+  .card-title { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 10px; }
+
+  /* Gauge */
+  .gauge-wrap { display: flex; align-items: center; gap: 16px; }
+  .gauge-ring { position: relative; width: 80px; height: 80px; flex-shrink: 0; }
+  .gauge-ring svg { transform: rotate(-90deg); }
+  .gauge-ring .track { fill: none; stroke: var(--border); stroke-width: 8; }
+  .gauge-ring .fill { fill: none; stroke-width: 8; stroke-linecap: round; transition: stroke-dashoffset .6s ease, stroke .3s; }
+  .gauge-value { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 700; }
+  .gauge-info { flex: 1; }
+  .gauge-label { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+  .gauge-sub { color: var(--muted); font-size: 12px; line-height: 1.6; }
+
+  /* Sparkline */
+  canvas.spark { width: 100%; height: 60px; display: block; margin-top: 10px; }
+
+  /* Per-core grid */
+  .core-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); gap: 8px; margin-top: 8px; }
+  .core-item { background: var(--bg); border-radius: 6px; padding: 6px; text-align: center; }
+  .core-item .core-label { font-size: 10px; color: var(--muted); }
+  .core-item .core-val { font-size: 13px; font-weight: 600; margin-top: 2px; }
+  .core-bar { height: 4px; border-radius: 2px; margin-top: 4px; background: var(--border); }
+  .core-bar-fill { height: 100%; border-radius: 2px; transition: width .4s; }
+
+  /* Disk bars */
+  .disk-item { margin-bottom: 12px; }
+  .disk-item:last-child { margin-bottom: 0; }
+  .disk-header { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 12px; }
+  .disk-mount { color: var(--text); font-weight: 500; }
+  .disk-pct { color: var(--muted); }
+  .bar-track { background: var(--border); border-radius: 4px; height: 8px; }
+  .bar-fill { height: 100%; border-radius: 4px; transition: width .5s; }
+
+  /* Process table */
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .5px; padding: 6px 8px; border-bottom: 1px solid var(--border); font-weight: 500; }
+  td { padding: 5px 8px; font-size: 12px; border-bottom: 1px solid #1f2235; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #1f2235; }
+
+  /* Network card */
+  .net-row { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; font-size: 13px; }
+  .net-label { color: var(--muted); font-size: 11px; }
+  .net-val { font-weight: 600; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1><span id="status-dot"></span>デスクトップ負荷モニター</h1>
+  <span id="timestamp">--</span>
+</header>
+
+<main>
+  <!-- Row 1: summary cards -->
+  <div class="grid-4">
+    <div class="card" id="card-cpu-summary">
+      <div class="card-title">CPU</div>
+      <div class="gauge-wrap">
+        <div class="gauge-ring"><svg viewBox="0 0 80 80" width="80" height="80">
+          <circle class="track" cx="40" cy="40" r="34"/>
+          <circle class="fill" id="gauge-cpu" cx="40" cy="40" r="34" stroke="var(--blue)"
+            stroke-dasharray="213.6" stroke-dashoffset="213.6"/>
+        </svg><div class="gauge-value" id="cpu-pct">0%</div></div>
+        <div class="gauge-info">
+          <div class="gauge-label" id="cpu-freq">--</div>
+          <div class="gauge-sub" id="cpu-cores">--</div>
+        </div>
+      </div>
+      <canvas class="spark" id="spark-cpu"></canvas>
+    </div>
+
+    <div class="card" id="card-mem-summary">
+      <div class="card-title">メモリ</div>
+      <div class="gauge-wrap">
+        <div class="gauge-ring"><svg viewBox="0 0 80 80" width="80" height="80">
+          <circle class="track" cx="40" cy="40" r="34"/>
+          <circle class="fill" id="gauge-mem" cx="40" cy="40" r="34" stroke="var(--purple)"
+            stroke-dasharray="213.6" stroke-dashoffset="213.6"/>
+        </svg><div class="gauge-value" id="mem-pct">0%</div></div>
+        <div class="gauge-info">
+          <div class="gauge-label" id="mem-used">--</div>
+          <div class="gauge-sub" id="mem-detail">--</div>
+        </div>
+      </div>
+      <canvas class="spark" id="spark-mem"></canvas>
+    </div>
+
+    <div class="card">
+      <div class="card-title">ネットワーク送信</div>
+      <div class="net-row">
+        <span class="net-label">転送速度</span>
+        <span class="net-val" id="net-sent">-- KB/s</span>
+      </div>
+      <canvas class="spark" id="spark-net-sent"></canvas>
+    </div>
+
+    <div class="card">
+      <div class="card-title">ネットワーク受信</div>
+      <div class="net-row">
+        <span class="net-label">転送速度</span>
+        <span class="net-val" id="net-recv">-- KB/s</span>
+      </div>
+      <canvas class="spark" id="spark-net-recv"></canvas>
+    </div>
+  </div>
+
+  <!-- Row 2: per-core + disk -->
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">CPUコア別使用率</div>
+      <div class="core-grid" id="core-grid"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">ディスク</div>
+      <div id="disk-list"></div>
+    </div>
+  </div>
+
+  <!-- Row 3: process table -->
+  <div class="card">
+    <div class="card-title">プロセス (CPU使用率順 TOP 20)</div>
+    <div style="overflow-x:auto">
+      <table>
+        <thead><tr>
+          <th>PID</th><th>プロセス名</th><th>CPU %</th><th>メモリ %</th><th>状態</th>
+        </tr></thead>
+        <tbody id="proc-body"></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<script>
+const CIRC = 2 * Math.PI * 34; // 213.6
+
+function setGauge(id, pct) {
+  const el = document.getElementById(id);
+  el.style.strokeDashoffset = CIRC * (1 - pct / 100);
+  el.style.stroke = pct > 85 ? 'var(--red)' : pct > 60 ? 'var(--yellow)' : el.getAttribute('stroke') || 'var(--blue)';
+}
+
+function colorForPct(p) {
+  return p > 85 ? 'var(--red)' : p > 60 ? 'var(--yellow)' : 'var(--green)';
+}
+
+// Sparkline renderer
+function drawSpark(canvasId, data, color) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  if (w === 0) return;
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  if (!data || data.length < 2) return;
+  const max = Math.max(...data, 1);
+  const step = w / (data.length - 1);
+
+  ctx.clearRect(0, 0, w, h);
+
+  // Gradient fill
+  const grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, color.replace(')', ', .3)').replace('var(', 'rgba(').replace(/var\(--\w+\)/, color) + '30');
+  grad.addColorStop(1, 'transparent');
+
+  ctx.beginPath();
+  ctx.moveTo(0, h - (data[0] / max) * h * .9);
+  data.forEach((v, i) => ctx.lineTo(i * step, h - (v / max) * h * .9));
+  ctx.lineTo(w, h);
+  ctx.lineTo(0, h);
+  ctx.closePath();
+  ctx.fillStyle = color + '22';
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(0, h - (data[0] / max) * h * .9);
+  data.forEach((v, i) => ctx.lineTo(i * step, h - (v / max) * h * .9));
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+}
+
+// Resolve CSS variable to hex/rgb for canvas
+function cssVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+function fmtKB(kb) {
+  if (kb >= 1024 * 1024) return (kb / 1024 / 1024).toFixed(1) + ' GB/s';
+  if (kb >= 1024) return (kb / 1024).toFixed(1) + ' MB/s';
+  return kb.toFixed(0) + ' KB/s';
+}
+
+function update(data) {
+  document.getElementById('timestamp').textContent = data.timestamp;
+
+  // CPU
+  const cpu = data.cpu;
+  const cpuPct = cpu.percent;
+  document.getElementById('cpu-pct').textContent = cpuPct + '%';
+  setGauge('gauge-cpu', cpuPct);
+  document.getElementById('cpu-freq').textContent = cpu.freq_current_mhz ? cpu.freq_current_mhz + ' MHz' : '--';
+  document.getElementById('cpu-cores').textContent =
+    `物理: ${cpu.count_physical}コア\n論理: ${cpu.count_logical}スレッド`;
+
+  // Memory
+  const mem = data.memory;
+  document.getElementById('mem-pct').textContent = mem.percent + '%';
+  setGauge('gauge-mem', mem.percent);
+  document.getElementById('mem-used').textContent = mem.used_gb + ' GB';
+  document.getElementById('mem-detail').textContent =
+    `合計: ${mem.total_gb} GB\n空き: ${mem.available_gb} GB\nSwap: ${mem.swap_used_gb}/${mem.swap_total_gb} GB`;
+
+  // Network
+  const h = data.history;
+  const lastSent = h.net_sent.at(-1) || 0;
+  const lastRecv = h.net_recv.at(-1) || 0;
+  document.getElementById('net-sent').textContent = fmtKB(lastSent);
+  document.getElementById('net-recv').textContent = fmtKB(lastRecv);
+
+  // Sparklines
+  drawSpark('spark-cpu', h.cpu, '#3b82f6');
+  drawSpark('spark-mem', h.mem, '#a855f7');
+  drawSpark('spark-net-sent', h.net_sent, '#06b6d4');
+  drawSpark('spark-net-recv', h.net_recv, '#22c55e');
+
+  // Per-core
+  const grid = document.getElementById('core-grid');
+  grid.innerHTML = '';
+  cpu.per_core.forEach((pct, i) => {
+    const color = colorForPct(pct);
+    grid.insertAdjacentHTML('beforeend', `
+      <div class="core-item">
+        <div class="core-label">Core ${i}</div>
+        <div class="core-val" style="color:${color}">${pct}%</div>
+        <div class="core-bar"><div class="core-bar-fill" style="width:${pct}%;background:${color}"></div></div>
+      </div>`);
+  });
+
+  // Disk
+  const diskList = document.getElementById('disk-list');
+  diskList.innerHTML = '';
+  data.disks.forEach(d => {
+    const color = colorForPct(d.percent);
+    diskList.insertAdjacentHTML('beforeend', `
+      <div class="disk-item">
+        <div class="disk-header">
+          <span class="disk-mount">${d.mountpoint} <small style="color:var(--muted)">(${d.device})</small></span>
+          <span class="disk-pct">${d.used_gb}/${d.total_gb} GB (${d.percent}%)</span>
+        </div>
+        <div class="bar-track"><div class="bar-fill" style="width:${d.percent}%;background:${color}"></div></div>
+      </div>`);
+  });
+
+  // Processes
+  const tbody = document.getElementById('proc-body');
+  tbody.innerHTML = '';
+  data.processes.forEach(p => {
+    const cpu = (p.cpu_percent || 0).toFixed(1);
+    const mem = (p.memory_percent || 0).toFixed(1);
+    tbody.insertAdjacentHTML('beforeend', `
+      <tr>
+        <td>${p.pid}</td>
+        <td title="${p.name}">${p.name}</td>
+        <td style="color:${colorForPct(p.cpu_percent)}">${cpu}%</td>
+        <td style="color:${colorForPct(p.memory_percent * 5)}">${mem}%</td>
+        <td style="color:var(--muted)">${p.status}</td>
+      </tr>`);
+  });
+}
+
+async function fetchAndUpdate() {
+  try {
+    const r = await fetch('/api/stats');
+    if (!r.ok) throw new Error(r.status);
+    const data = await r.json();
+    update(data);
+    document.getElementById('status-dot').style.background = 'var(--green)';
+  } catch (e) {
+    document.getElementById('status-dot').style.background = 'var(--red)';
+  }
+}
+
+fetchAndUpdate();
+setInterval(fetchAndUpdate, 2000);
+</script>
+</body>
+</html>
