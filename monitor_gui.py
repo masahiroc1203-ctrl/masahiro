@@ -26,9 +26,9 @@ def color_for_pct(p):
     if p > 60: return YELLOW
     return GREEN
 
-# ── Shared data store (written by BG thread, read by UI thread) ─
-_lock = threading.Lock()
-_data = {}          # latest snapshot
+# ── Shared data store (written by BG threads, read by UI thread) ─
+_lock    = threading.Lock()
+_data    = {}
 _history = {"cpu": [], "mem": [], "net_sent": [], "net_recv": []}
 _MAX_H   = 60
 
@@ -36,8 +36,8 @@ def get_snapshot():
     with _lock:
         return dict(_data), {k: list(v) for k, v in _history.items()}
 
-# ── Background collection thread ────────────────────────────────
-def _collector():
+# ── Fast collector: CPU / memory / network  (every 1 s) ─────────
+def _fast_collector():
     prev_net  = psutil.net_io_counters()
     prev_time = time.time()
     psutil.cpu_percent(percpu=True)   # discard first (always 0)
@@ -59,6 +59,35 @@ def _collector():
         mem     = psutil.virtual_memory()
         swap    = psutil.swap_memory()
 
+        snap = {
+            "ts":         time.strftime("%Y-%m-%d %H:%M:%S"),
+            "cpu_pct":    cpu_pct,
+            "cores":      cores,
+            "freq":       round(freq.current) if freq else None,
+            "n_phys":     psutil.cpu_count(logical=False),
+            "n_logic":    psutil.cpu_count(logical=True),
+            "mem_pct":    mem.percent,
+            "mem_used":   round(mem.used        / 1e9, 1),
+            "mem_total":  round(mem.total       / 1e9, 1),
+            "mem_avail":  round(mem.available   / 1e9, 1),
+            "swap_used":  round(swap.used       / 1e9, 1),
+            "swap_total": round(swap.total      / 1e9, 1),
+            "net_sent":   round(sent_kb, 2),
+            "net_recv":   round(recv_kb, 2),
+        }
+
+        with _lock:
+            _data.update(snap)
+            for key in ("cpu", "mem", "net_sent", "net_recv"):
+                src = "cpu_pct" if key == "cpu" else \
+                      "mem_pct" if key == "mem" else key
+                _history[key].append(snap[src])
+                if len(_history[key]) > _MAX_H:
+                    _history[key].pop(0)
+
+# ── Slow collector: processes / disk  (every 5 s) ───────────────
+def _slow_collector():
+    while True:
         # Processes
         procs = []
         for p in psutil.process_iter(["pid", "name", "cpu_percent",
@@ -69,7 +98,7 @@ def _collector():
                 pass
         procs.sort(key=lambda x: x.get("cpu_percent") or 0, reverse=True)
 
-        # Disks (cheap, query every cycle)
+        # Disks
         disks = []
         for part in psutil.disk_partitions(all=False):
             try:
@@ -83,33 +112,11 @@ def _collector():
             except PermissionError:
                 pass
 
-        snapshot = {
-            "ts":        time.strftime("%Y-%m-%d %H:%M:%S"),
-            "cpu_pct":   cpu_pct,
-            "cores":     cores,
-            "freq":      round(freq.current) if freq else None,
-            "n_phys":    psutil.cpu_count(logical=False),
-            "n_logic":   psutil.cpu_count(logical=True),
-            "mem_pct":   mem.percent,
-            "mem_used":  round(mem.used   / 1e9, 1),
-            "mem_total": round(mem.total  / 1e9, 1),
-            "mem_avail": round(mem.available / 1e9, 1),
-            "swap_used": round(swap.used  / 1e9, 1),
-            "swap_total":round(swap.total / 1e9, 1),
-            "net_sent":  round(sent_kb, 2),
-            "net_recv":  round(recv_kb, 2),
-            "disks":     disks,
-            "procs":     procs[:20],
-        }
-
         with _lock:
-            _data.update(snapshot)
-            for key in ("cpu", "mem", "net_sent", "net_recv"):
-                src = "cpu_pct" if key == "cpu" else \
-                      "mem_pct" if key == "mem" else key
-                _history[key].append(snapshot[src])
-                if len(_history[key]) > _MAX_H:
-                    _history[key].pop(0)
+            _data["procs"] = procs[:20]
+            _data["disks"] = disks
+
+        time.sleep(5)
 
 # ── Circular gauge (Canvas) ─────────────────────────────────────
 class GaugeCanvas(tk.Canvas):
@@ -512,5 +519,6 @@ class App(tk.Tk):
 
 
 if __name__ == "__main__":
-    threading.Thread(target=_collector, daemon=True).start()
+    threading.Thread(target=_fast_collector, daemon=True).start()
+    threading.Thread(target=_slow_collector, daemon=True).start()
     App().mainloop()
