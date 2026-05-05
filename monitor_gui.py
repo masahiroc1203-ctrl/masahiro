@@ -28,7 +28,7 @@ def color_for_pct(p):
 
 # ── Shared data store (written by BG threads, read by UI thread) ─
 _lock    = threading.Lock()
-_data    = {}
+_data    = {"disks": [], "procs": []}   # default so UI never sees KeyError
 _history = {"cpu": [], "mem": [], "net_sent": [], "net_recv": []}
 _MAX_H   = 60
 
