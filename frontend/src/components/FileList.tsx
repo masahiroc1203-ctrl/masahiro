@@ -2,6 +2,8 @@ import { FileInfo, downloadFile } from "../api/client";
 
 interface Props {
   files: FileInfo[];
+  selectedForMerge: Set<string>;
+  onToggleMerge: (filename: string, checked: boolean) => void;
   onRename: (filename: string) => void;
   onViewContent: (filename: string) => void;
   onSplit: (filename: string) => void;
@@ -21,7 +23,7 @@ function formatDate(iso: string): string {
   return d.toLocaleString("ja-JP");
 }
 
-export default function FileList({ files, onRename, onViewContent, onSplit, onMoveUp, onMoveDown, onClearAll }: Props) {
+export default function FileList({ files, selectedForMerge, onToggleMerge, onRename, onViewContent, onSplit, onMoveUp, onMoveDown, onClearAll }: Props) {
   if (files.length === 0) {
     return <p className="no-files">アップロードされたファイルはありません</p>;
   }
@@ -36,6 +38,7 @@ export default function FileList({ files, onRename, onViewContent, onSplit, onMo
       <table className="file-table">
         <thead>
           <tr>
+            <th className="merge-col">結合</th>
             <th>ファイル名</th>
             <th>サイズ</th>
             <th>更新日時</th>
@@ -45,6 +48,13 @@ export default function FileList({ files, onRename, onViewContent, onSplit, onMo
         <tbody>
           {files.map((f, index) => (
             <tr key={f.filename}>
+              <td className="merge-col">
+                <input
+                  type="checkbox"
+                  checked={selectedForMerge.has(f.filename)}
+                  onChange={(e) => onToggleMerge(f.filename, e.target.checked)}
+                />
+              </td>
               <td className="filename-cell">{f.filename}</td>
               <td>{formatSize(f.size)}</td>
               <td>{formatDate(f.modified_at)}</td>

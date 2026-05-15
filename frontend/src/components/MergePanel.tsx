@@ -2,30 +2,17 @@ import { useState } from "react";
 import { FileInfo, mergeFiles } from "../api/client";
 
 interface Props {
-  files: FileInfo[];
+  filesToMerge: FileInfo[];
   onClose: () => void;
   onMerged: () => void;
 }
 
-export default function MergePanel({ files, onClose, onMerged }: Props) {
-  const [selectedOrder, setSelectedOrder] = useState<string[]>([]);
+export default function MergePanel({ filesToMerge, onClose, onMerged }: Props) {
   const [outputFilename, setOutputFilename] = useState("merged.pdf");
   const [merging, setMerging] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleCheckbox = (filename: string, checked: boolean) => {
-    if (checked) {
-      setSelectedOrder((prev) => [...prev, filename]);
-    } else {
-      setSelectedOrder((prev) => prev.filter((f) => f !== filename));
-    }
-  };
-
   const handleMerge = async () => {
-    if (selectedOrder.length < 2) {
-      setError("2件以上のファイルを選択してください");
-      return;
-    }
     if (!outputFilename.trim()) {
       setError("出力ファイル名を入力してください");
       return;
@@ -37,7 +24,7 @@ export default function MergePanel({ files, onClose, onMerged }: Props) {
     setMerging(true);
     setError(null);
     try {
-      await mergeFiles(selectedOrder, outputFilename.trim());
+      await mergeFiles(filesToMerge.map((f) => f.filename), outputFilename.trim());
       onMerged();
       onClose();
     } catch (e) {
@@ -56,30 +43,12 @@ export default function MergePanel({ files, onClose, onMerged }: Props) {
         <h2>PDFを結合</h2>
 
         <div className="modal-field">
-          <label>結合するファイルを選択（チェックした順に結合）</label>
-          {files.length === 0 ? (
-            <p className="status-msg">ファイルがありません</p>
-          ) : (
-            <ul className="merge-file-list">
-              {files.map((f) => (
-                <li key={f.filename} className="merge-file-item">
-                  <label className="merge-file-label">
-                    <input
-                      type="checkbox"
-                      checked={selectedOrder.includes(f.filename)}
-                      onChange={(e) => handleCheckbox(f.filename, e.target.checked)}
-                    />
-                    <span>{f.filename}</span>
-                  </label>
-                </li>
-              ))}
-            </ul>
-          )}
-          {selectedOrder.length > 0 && (
-            <p className="status-msg merge-order-hint">
-              結合順: {selectedOrder.join(" → ")}
-            </p>
-          )}
+          <label>結合するファイル（一覧の順番で結合）</label>
+          <ol className="merge-file-list">
+            {filesToMerge.map((f) => (
+              <li key={f.filename} className="merge-file-item">{f.filename}</li>
+            ))}
+          </ol>
         </div>
 
         <div className="modal-field">
@@ -99,7 +68,7 @@ export default function MergePanel({ files, onClose, onMerged }: Props) {
           <button
             className="btn btn-primary"
             onClick={handleMerge}
-            disabled={merging || selectedOrder.length < 2}
+            disabled={merging}
           >
             {merging ? "結合中..." : "結合実行"}
           </button>

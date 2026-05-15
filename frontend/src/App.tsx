@@ -9,6 +9,7 @@ import SplitPanel from "./components/SplitPanel";
 
 export default function App() {
   const [files, setFiles] = useState<FileInfo[]>([]);
+  const [selectedForMerge, setSelectedForMerge] = useState<Set<string>>(new Set());
   const [renameTarget, setRenameTarget] = useState<string | null>(null);
   const [contentTarget, setContentTarget] = useState<string | null>(null);
   const [splitTarget, setSplitTarget] = useState<string | null>(null);
@@ -20,6 +21,12 @@ export default function App() {
     try {
       const list = await listFiles();
       setFiles(list);
+      // 取得後、存在しないファイルのチェックを外す
+      setSelectedForMerge((prev) => {
+        const names = new Set(list.map((f) => f.filename));
+        const next = new Set([...prev].filter((n) => names.has(n)));
+        return next;
+      });
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : "ファイル一覧の取得に失敗しました");
     }
@@ -95,6 +102,15 @@ export default function App() {
     setSplitTarget(null);
   };
 
+  const handleToggleMerge = (filename: string, checked: boolean) => {
+    setSelectedForMerge((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(filename);
+      else next.delete(filename);
+      return next;
+    });
+  };
+
   const handleOpenMerge = () => {
     setShowMerge(true);
   };
@@ -112,8 +128,13 @@ export default function App() {
       <header className="app-header">
         <div className="header-row">
           <h1>PDF操作アプリ</h1>
-          <button className="btn btn-merge" onClick={handleOpenMerge}>
-            PDFを結合
+          <button
+            className="btn btn-merge"
+            onClick={handleOpenMerge}
+            disabled={selectedForMerge.size < 2}
+            title={selectedForMerge.size < 2 ? "2件以上チェックしてください" : ""}
+          >
+            PDFを結合 {selectedForMerge.size >= 2 ? `(${selectedForMerge.size}件)` : ""}
           </button>
         </div>
       </header>
@@ -131,6 +152,8 @@ export default function App() {
           ) : (
             <FileList
               files={files}
+              selectedForMerge={selectedForMerge}
+              onToggleMerge={handleToggleMerge}
               onRename={handleRename}
               onViewContent={handleViewContent}
               onSplit={handleSplit}
@@ -167,7 +190,7 @@ export default function App() {
 
       {showMerge && (
         <MergePanel
-          files={files}
+          filesToMerge={files.filter((f) => selectedForMerge.has(f.filename))}
           onClose={handleCloseMerge}
           onMerged={handleMerged}
         />
