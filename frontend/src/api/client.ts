@@ -75,3 +75,63 @@ export async function executeRename(
   }
   return res.json();
 }
+
+export interface ContentResult {
+  filename: string;
+  total_pages: number;
+  pages: { page_num: number; text: string }[];
+}
+
+export async function getContent(filename: string): Promise<ContentResult> {
+  const res = await fetch(`/api/content/${encodeURIComponent(filename)}/text`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail ?? "Failed to fetch content");
+  }
+  return res.json();
+}
+
+export interface MergeResult {
+  output_filename: string;
+  merged_count: number;
+}
+
+export async function mergeFiles(
+  filenames: string[],
+  outputFilename: string
+): Promise<MergeResult> {
+  const res = await fetch("/api/merge", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ filenames, output_filename: outputFilename }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail ?? "Merge failed");
+  }
+  return res.json();
+}
+
+export interface SplitResult {
+  original_filename: string;
+  output_files: string[];
+  split_count: number;
+}
+
+export async function splitFile(
+  filename: string,
+  mode: "ranges" | "every",
+  ranges?: [number, number][],
+  every?: number
+): Promise<SplitResult> {
+  const res = await fetch(`/api/split/${encodeURIComponent(filename)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ mode, ranges, every }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail ?? "Split failed");
+  }
+  return res.json();
+}
