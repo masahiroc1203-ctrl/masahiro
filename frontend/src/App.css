@@ -239,3 +239,142 @@ body {
   gap: 10px;
   margin-top: 24px;
 }
+
+/* Header row with merge button */
+.header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Merge button */
+.btn-merge {
+  background-color: #7b1fa2;
+  color: #fff;
+}
+
+/* View content button */
+.btn-view-content {
+  background-color: #0288d1;
+  color: #fff;
+}
+
+/* Split button */
+.btn-split {
+  background-color: #388e3c;
+  color: #fff;
+}
+
+/* Content viewer modal */
+.content-viewer {
+  max-width: 720px;
+  max-height: 80vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.content-pages {
+  margin-top: 8px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.content-page {
+  margin-bottom: 16px;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 12px;
+}
+
+.content-page:last-child {
+  border-bottom: none;
+}
+
+.content-page-header {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #888;
+  margin-bottom: 6px;
+  text-align: center;
+}
+
+.content-page-text {
+  font-size: 0.875rem;
+  white-space: pre-wrap;
+  color: #222;
+  background: #f9f9f9;
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+
+/* Merge panel */
+.merge-panel {
+  max-width: 560px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.merge-file-list {
+  list-style: none;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  max-height: 240px;
+  overflow-y: auto;
+  background: #fafafa;
+}
+
+.merge-file-item {
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.merge-file-item:last-child {
+  border-bottom: none;
+}
+
+.merge-file-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.merge-file-label:hover {
+  background-color: #f0f0f0;
+}
+
+.merge-order-hint {
+  margin-top: 8px;
+  color: #555;
+  font-size: 0.8rem;
+  word-break: break-all;
+}
+
+/* Split panel */
+.split-panel {
+  max-width: 520px;
+}
+
+.split-mode-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.split-radio-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.split-ranges-input {
+  resize: vertical;
+  font-family: monospace;
+}
+
+.split-every-input {
+  width: 120px;
+}

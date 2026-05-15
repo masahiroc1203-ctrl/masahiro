@@ -3,6 +3,8 @@ import { FileInfo, downloadFile } from "../api/client";
 interface Props {
   files: FileInfo[];
   onRename: (filename: string) => void;
+  onViewContent: (filename: string) => void;
+  onSplit: (filename: string) => void;
 }
 
 function formatSize(bytes: number): string {
@@ -16,7 +18,7 @@ function formatDate(iso: string): string {
   return d.toLocaleString("ja-JP");
 }
 
-export default function FileList({ files, onRename }: Props) {
+export default function FileList({ files, onRename, onViewContent, onSplit }: Props) {
   if (files.length === 0) {
     return <p className="no-files">アップロードされたファイルはありません</p>;
   }
@@ -49,6 +51,18 @@ export default function FileList({ files, onRename }: Props) {
                 onClick={() => onRename(f.filename)}
               >
                 リネーム
+              </button>
+              <button
+                className="btn btn-view-content"
+                onClick={() => onViewContent(f.filename)}
+              >
+                内容表示
+              </button>
+              <button
+                className="btn btn-split"
+                onClick={() => onSplit(f.filename)}
+              >
+                分割
               </button>
             </td>
           </tr>
