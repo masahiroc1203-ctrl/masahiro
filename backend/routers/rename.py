@@ -25,6 +25,15 @@ class RenameRequest(BaseModel):
     new_filename: str
 
 
+class BatchRenameItem(BaseModel):
+    original_filename: str
+    new_filename: str
+
+
+class BatchRenameRequest(BaseModel):
+    renames: list[BatchRenameItem]
+
+
 @router.get("/{filename}/preview")
 async def preview_rename(filename: str):
     filename = safe_filename(filename)
@@ -74,3 +83,31 @@ async def rename_file(filename: str, body: RenameRequest):
 
     src.rename(dst)
     return {"old_filename": filename, "new_filename": new_filename}
+
+
+@router.post("/batch")
+async def batch_rename(body: BatchRenameRequest):
+    results = []
+    errors = []
+    for item in body.renames:
+        try:
+            orig = safe_filename(item.original_filename)
+            new = safe_filename(item.new_filename)
+            if not new.lower().endswith(".pdf"):
+                errors.append({"original_filename": orig, "error": ".pdf で終わる必要があります"})
+                continue
+            src = UPLOADS_DIR / orig
+            dst = UPLOADS_DIR / new
+            if not src.exists() or not src.is_file():
+                errors.append({"original_filename": orig, "error": "ファイルが見つかりません"})
+                continue
+            if dst.exists() and orig != new:
+                errors.append({"original_filename": orig, "error": "同名ファイルが既に存在します"})
+                continue
+            src.rename(dst)
+            results.append({"old_filename": orig, "new_filename": new})
+        except HTTPException as e:
+            errors.append({"original_filename": item.original_filename, "error": e.detail})
+        except Exception as e:
+            errors.append({"original_filename": item.original_filename, "error": str(e)})
+    return {"results": results, "errors": errors}

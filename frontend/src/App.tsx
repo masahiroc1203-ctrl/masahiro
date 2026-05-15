@@ -3,6 +3,7 @@ import { FileInfo, listFiles, clearAllFiles } from "./api/client";
 import FileUpload from "./components/FileUpload";
 import FileList from "./components/FileList";
 import RenamePanel from "./components/RenamePanel";
+import BatchRenamePanel from "./components/BatchRenamePanel";
 import ContentViewer from "./components/ContentViewer";
 import MergePanel from "./components/MergePanel";
 import SplitPanel from "./components/SplitPanel";
@@ -14,6 +15,7 @@ export default function App() {
   const [contentTarget, setContentTarget] = useState<string | null>(null);
   const [splitTarget, setSplitTarget] = useState<string | null>(null);
   const [showMerge, setShowMerge] = useState(false);
+  const [showBatchRename, setShowBatchRename] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const fetchFiles = useCallback(async () => {
@@ -115,6 +117,14 @@ export default function App() {
     setShowMerge(true);
   };
 
+  const handleOpenBatchRename = () => {
+    setShowBatchRename(true);
+  };
+
+  const handleCloseBatchRename = () => {
+    setShowBatchRename(false);
+  };
+
   const handleCloseMerge = () => {
     setShowMerge(false);
   };
@@ -135,6 +145,13 @@ export default function App() {
             title={selectedForMerge.size < 2 ? "2件以上チェックしてください" : ""}
           >
             PDFを結合 {selectedForMerge.size >= 2 ? `(${selectedForMerge.size}件)` : ""}
+          </button>
+          <button
+            className="btn btn-batch-rename"
+            onClick={handleOpenBatchRename}
+            disabled={files.length === 0}
+          >
+            一括リネーム
           </button>
         </div>
       </header>
@@ -193,6 +210,14 @@ export default function App() {
           filesToMerge={files.filter((f) => selectedForMerge.has(f.filename))}
           onClose={handleCloseMerge}
           onMerged={handleMerged}
+        />
+      )}
+
+      {showBatchRename && (
+        <BatchRenamePanel
+          files={files}
+          onClose={handleCloseBatchRename}
+          onRenamed={fetchFiles}
         />
       )}
     </div>

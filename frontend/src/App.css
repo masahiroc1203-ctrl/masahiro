@@ -402,3 +402,89 @@ body {
 .split-every-input {
   width: 120px;
 }
+
+/* Keyword inputs in RenamePanel */
+.keyword-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Batch rename */
+.btn-batch-rename {
+  background-color: #7b1fa2;
+  color: #fff;
+  border: none;
+}
+
+.btn-batch-rename:hover:not(:disabled) {
+  background-color: #6a1b9a;
+}
+
+.batch-rename-panel {
+  max-width: 900px;
+  width: 95vw;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.batch-rename-table-wrap {
+  overflow: auto;
+  flex: 1;
+  margin: 12px 0;
+}
+
+.batch-rename-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.batch-rename-table th,
+.batch-rename-table td {
+  padding: 8px 10px;
+  border: 1px solid #e0e0e0;
+  text-align: left;
+}
+
+.batch-rename-table th {
+  background: #fafafa;
+  font-weight: 600;
+  color: #555;
+  white-space: nowrap;
+}
+
+.batch-orig-name {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.8rem;
+  color: #555;
+}
+
+.batch-kw-input {
+  width: 120px;
+  padding: 4px 6px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+.batch-preview-name {
+  font-size: 0.8rem;
+  color: #1565c0;
+  white-space: nowrap;
+}
+
+.result-list {
+  margin-top: 6px;
+  padding-left: 16px;
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+
+.error-list {
+  color: #c62828;
+}

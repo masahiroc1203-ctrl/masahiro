@@ -131,6 +131,29 @@ export async function clearAllFiles(): Promise<ClearResult> {
   return res.json();
 }
 
+export interface BatchRenameItem {
+  original_filename: string;
+  new_filename: string;
+}
+
+export interface BatchRenameResult {
+  results: { old_filename: string; new_filename: string }[];
+  errors: { original_filename: string; error: string }[];
+}
+
+export async function batchRename(renames: BatchRenameItem[]): Promise<BatchRenameResult> {
+  const res = await fetch("/api/rename/batch", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ renames }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail ?? "Batch rename failed");
+  }
+  return res.json();
+}
+
 export async function splitFile(
   filename: string,
   mode: "ranges" | "every",
