@@ -9,10 +9,9 @@ from typing import Any, Dict, Optional
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 
 from video_editor.config import (
     AppConfig,
@@ -32,8 +31,11 @@ from video_editor.pipeline import VideoEditingPipeline
 app = FastAPI(title="動画自動編集ツール", docs_url=None, redoc_url=None)
 
 BASE_DIR = Path(__file__).parent
-app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
-templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+_STATIC = BASE_DIR / "static"
+if _STATIC.exists():
+    app.mount("/static", StaticFiles(directory=str(_STATIC)), name="static")
+
+_HTML = (BASE_DIR / "templates" / "index.html").read_text(encoding="utf-8")
 
 UPLOAD_DIR = Path("./uploads")
 OUTPUT_DIR = Path("./outputs")
@@ -49,8 +51,8 @@ _jobs: Dict[str, Dict[str, Any]] = {}
 
 
 @app.get("/", response_class=HTMLResponse)
-async def index(request: Request) -> HTMLResponse:
-    return templates.TemplateResponse("index.html", {"request": request})
+async def index() -> HTMLResponse:
+    return HTMLResponse(content=_HTML)
 
 
 @app.post("/api/process")
