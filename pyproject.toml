@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "video-editor"
+version = "0.1.0"
+description = "工場工程動画のサイクル自動編集ツール"
+requires-python = ">=3.10"
+dependencies = [
+    "opencv-python>=4.9.0",
+    "numpy>=1.26.0",
+    "scipy>=1.12.0",
+    "pydantic>=2.6.0",
+    "pyyaml>=6.0.1",
+    "typer[all]>=0.12.0",
+]
+
+[project.scripts]
+video-editor = "video_editor.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"
+
+[tool.coverage.run]
+source = ["src"]
