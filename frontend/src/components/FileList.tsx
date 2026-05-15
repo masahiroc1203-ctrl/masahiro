@@ -5,6 +5,9 @@ interface Props {
   onRename: (filename: string) => void;
   onViewContent: (filename: string) => void;
   onSplit: (filename: string) => void;
+  onMoveUp: (filename: string) => void;
+  onMoveDown: (filename: string) => void;
+  onClearAll: () => void;
 }
 
 function formatSize(bytes: number): string {
@@ -18,56 +21,77 @@ function formatDate(iso: string): string {
   return d.toLocaleString("ja-JP");
 }
 
-export default function FileList({ files, onRename, onViewContent, onSplit }: Props) {
+export default function FileList({ files, onRename, onViewContent, onSplit, onMoveUp, onMoveDown, onClearAll }: Props) {
   if (files.length === 0) {
     return <p className="no-files">アップロードされたファイルはありません</p>;
   }
 
   return (
-    <table className="file-table">
-      <thead>
-        <tr>
-          <th>ファイル名</th>
-          <th>サイズ</th>
-          <th>更新日時</th>
-          <th>操作</th>
-        </tr>
-      </thead>
-      <tbody>
-        {files.map((f) => (
-          <tr key={f.filename}>
-            <td className="filename-cell">{f.filename}</td>
-            <td>{formatSize(f.size)}</td>
-            <td>{formatDate(f.modified_at)}</td>
-            <td className="action-cell">
-              <button
-                className="btn btn-secondary"
-                onClick={() => downloadFile(f.filename)}
-              >
-                ダウンロード
-              </button>
-              <button
-                className="btn btn-primary"
-                onClick={() => onRename(f.filename)}
-              >
-                リネーム
-              </button>
-              <button
-                className="btn btn-view-content"
-                onClick={() => onViewContent(f.filename)}
-              >
-                内容表示
-              </button>
-              <button
-                className="btn btn-split"
-                onClick={() => onSplit(f.filename)}
-              >
-                分割
-              </button>
-            </td>
+    <div>
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "8px" }}>
+        <button className="btn btn-danger" onClick={onClearAll}>
+          🗑 全削除
+        </button>
+      </div>
+      <table className="file-table">
+        <thead>
+          <tr>
+            <th>ファイル名</th>
+            <th>サイズ</th>
+            <th>更新日時</th>
+            <th>操作</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {files.map((f, index) => (
+            <tr key={f.filename}>
+              <td className="filename-cell">{f.filename}</td>
+              <td>{formatSize(f.size)}</td>
+              <td>{formatDate(f.modified_at)}</td>
+              <td className="action-cell">
+                <button
+                  className="btn btn-sm"
+                  onClick={() => onMoveUp(f.filename)}
+                  disabled={index === 0}
+                >
+                  ↑
+                </button>
+                <button
+                  className="btn btn-sm"
+                  onClick={() => onMoveDown(f.filename)}
+                  disabled={index === files.length - 1}
+                >
+                  ↓
+                </button>
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => downloadFile(f.filename)}
+                >
+                  ダウンロード
+                </button>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => onRename(f.filename)}
+                >
+                  リネーム
+                </button>
+                <button
+                  className="btn btn-view-content"
+                  onClick={() => onViewContent(f.filename)}
+                >
+                  内容表示
+                </button>
+                <button
+                  className="btn btn-split"
+                  onClick={() => onSplit(f.filename)}
+                >
+                  分割
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

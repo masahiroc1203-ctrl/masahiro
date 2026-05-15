@@ -70,6 +70,18 @@ async def list_files():
     return result
 
 
+@router.delete("/all")
+async def clear_all_files():
+    """uploads/ 内の全 PDF ファイルを削除する"""
+    UPLOADS_DIR.mkdir(exist_ok=True)
+    deleted = []
+    for path in UPLOADS_DIR.iterdir():
+        if path.is_file() and path.suffix.lower() == ".pdf":
+            path.unlink()
+            deleted.append(path.name)
+    return {"deleted_count": len(deleted), "deleted_files": deleted}
+
+
 @router.get("/{filename}/download")
 async def download_file(filename: str):
     filename = safe_filename(filename)

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { FileInfo, listFiles } from "./api/client";
+import { FileInfo, listFiles, clearAllFiles } from "./api/client";
 import FileUpload from "./components/FileUpload";
 import FileList from "./components/FileList";
 import RenamePanel from "./components/RenamePanel";
@@ -24,6 +24,36 @@ export default function App() {
       setLoadError(e instanceof Error ? e.message : "ファイル一覧の取得に失敗しました");
     }
   }, []);
+
+  const handleMoveUp = (filename: string) => {
+    setFiles((prev) => {
+      const idx = prev.findIndex((f) => f.filename === filename);
+      if (idx <= 0) return prev;
+      const next = [...prev];
+      [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
+      return next;
+    });
+  };
+
+  const handleMoveDown = (filename: string) => {
+    setFiles((prev) => {
+      const idx = prev.findIndex((f) => f.filename === filename);
+      if (idx < 0 || idx >= prev.length - 1) return prev;
+      const next = [...prev];
+      [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
+      return next;
+    });
+  };
+
+  const handleClearAll = async () => {
+    if (!window.confirm("全てのファイルを削除しますか？")) return;
+    try {
+      await clearAllFiles();
+      fetchFiles();
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : "ファイルの削除に失敗しました");
+    }
+  };
 
   useEffect(() => {
     fetchFiles();
@@ -104,6 +134,9 @@ export default function App() {
               onRename={handleRename}
               onViewContent={handleViewContent}
               onSplit={handleSplit}
+              onMoveUp={handleMoveUp}
+              onMoveDown={handleMoveDown}
+              onClearAll={handleClearAll}
             />
           )}
         </section>

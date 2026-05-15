@@ -118,6 +118,19 @@ export interface SplitResult {
   split_count: number;
 }
 
+export interface ClearResult {
+  deleted_count: number;
+  deleted_files: string[];
+}
+
+export async function clearAllFiles(): Promise<ClearResult> {
+  const res = await fetch("/api/files/all", { method: "DELETE" });
+  if (!res.ok) {
+    throw new Error("Failed to clear files");
+  }
+  return res.json();
+}
+
 export async function splitFile(
   filename: string,
   mode: "ranges" | "every",
