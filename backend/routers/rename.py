@@ -4,9 +4,10 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+import config
 from services.pdf_extractor import extract_hinmei
 
-UPLOADS_DIR = Path(__file__).parent.parent / "uploads"
+UPLOADS_DIR = config.UPLOADS_DIR
 
 router = APIRouter()
 

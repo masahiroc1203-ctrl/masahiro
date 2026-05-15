@@ -5,7 +5,9 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
-UPLOADS_DIR = Path(__file__).parent.parent / "uploads"
+import config
+
+UPLOADS_DIR = config.UPLOADS_DIR
 
 router = APIRouter()
 

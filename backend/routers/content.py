@@ -4,7 +4,9 @@ from pathlib import Path
 import pdfplumber
 from fastapi import APIRouter, HTTPException
 
-UPLOADS_DIR = Path(__file__).parent.parent / "uploads"
+import config
+
+UPLOADS_DIR = config.UPLOADS_DIR
 
 router = APIRouter()
 
