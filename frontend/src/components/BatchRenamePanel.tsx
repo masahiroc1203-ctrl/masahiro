@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { FileInfo, batchRename } from "../api/client";
-import { buildFilename } from "../utils/rename";
+import { buildFilename, getStem } from "../utils/rename";
 
 interface Props {
   files: FileInfo[];
@@ -14,6 +14,7 @@ export default function BatchRenamePanel({ files, onClose, onRenamed }: Props) {
   const [keywords, setKeywords] = useState<Record<string, Keywords>>(() =>
     Object.fromEntries(files.map((f) => [f.filename, { kw1: "", kw2: "", kw3: "" }]))
   );
+  const [withStem, setWithStem] = useState(true);
   const [running, setRunning] = useState(false);
   const [results, setResults] = useState<{ old: string; new: string }[]>([]);
   const [errors, setErrors] = useState<{ filename: string; error: string }[]>([]);
@@ -29,7 +30,7 @@ export default function BatchRenamePanel({ files, onClose, onRenamed }: Props) {
     const renames = files
       .map((f) => {
         const kw = keywords[f.filename] ?? { kw1: "", kw2: "", kw3: "" };
-        const newName = buildFilename(kw.kw1, kw.kw2, kw.kw3);
+        const newName = buildFilename(getStem(f.filename), kw.kw1, kw.kw2, kw.kw3, withStem);
         return newName ? { original_filename: f.filename, new_filename: newName } : null;
       })
       .filter((r): r is NonNullable<typeof r> => r !== null);
@@ -57,7 +58,7 @@ export default function BatchRenamePanel({ files, onClose, onRenamed }: Props) {
 
   const pendingCount = files.filter((f) => {
     const kw = keywords[f.filename];
-    return buildFilename(kw?.kw1 ?? "", kw?.kw2 ?? "", kw?.kw3 ?? "") !== "";
+    return buildFilename(getStem(f.filename), kw?.kw1 ?? "", kw?.kw2 ?? "", kw?.kw3 ?? "", withStem) !== "";
   }).length;
 
   const isDone = results.length > 0 || errors.length > 0;
@@ -73,6 +74,19 @@ export default function BatchRenamePanel({ files, onClose, onRenamed }: Props) {
 
         {!isDone ? (
           <>
+            <div className="modal-field">
+              <label>ファイル名の形式</label>
+              <div className="radio-group">
+                <label className="radio-label">
+                  <input type="radio" checked={withStem} onChange={() => setWithStem(true)} />
+                  元ファイル名 + キーワード（例: 元ファイル名_kw1_kw2.pdf）
+                </label>
+                <label className="radio-label">
+                  <input type="radio" checked={!withStem} onChange={() => setWithStem(false)} />
+                  キーワードのみ（例: kw1_kw2.pdf）
+                </label>
+              </div>
+            </div>
             <div className="batch-rename-table-wrap">
               <table className="batch-rename-table">
                 <thead>
@@ -87,7 +101,7 @@ export default function BatchRenamePanel({ files, onClose, onRenamed }: Props) {
                 <tbody>
                   {files.map((f) => {
                     const kw = keywords[f.filename] ?? { kw1: "", kw2: "", kw3: "" };
-                    const preview = buildFilename(kw.kw1, kw.kw2, kw.kw3);
+                    const preview = buildFilename(getStem(f.filename), kw.kw1, kw.kw2, kw.kw3, withStem);
                     return (
                       <tr key={f.filename}>
                         <td className="batch-orig-name">{f.filename}</td>

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { executeRename } from "../api/client";
-import { buildFilename } from "../utils/rename";
+import { buildFilename, getStem } from "../utils/rename";
 
 interface Props {
   filename: string;
@@ -9,17 +9,19 @@ interface Props {
 }
 
 export default function RenamePanel({ filename, onClose, onRenamed }: Props) {
+  const stem = getStem(filename);
   const [kw1, setKw1] = useState("");
   const [kw2, setKw2] = useState("");
   const [kw3, setKw3] = useState("");
+  const [withStem, setWithStem] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [renaming, setRenaming] = useState(false);
 
-  const preview = buildFilename(kw1, kw2, kw3);
+  const preview = buildFilename(stem, kw1, kw2, kw3, withStem);
 
   const handleRename = async () => {
     if (!preview) {
-      setError("少なくとも1つキーワードを入力してください");
+      setError("少なくともキーワード1を入力してください");
       return;
     }
     setRenaming(true);
@@ -45,14 +47,36 @@ export default function RenamePanel({ filename, onClose, onRenamed }: Props) {
           <p className="current-filename">{filename}</p>
         </div>
 
+        <div className="modal-field">
+          <label>ファイル名の形式</label>
+          <div className="radio-group">
+            <label className="radio-label">
+              <input
+                type="radio"
+                checked={withStem}
+                onChange={() => setWithStem(true)}
+              />
+              元ファイル名 + キーワード（例: {stem}_kw1_kw2.pdf）
+            </label>
+            <label className="radio-label">
+              <input
+                type="radio"
+                checked={!withStem}
+                onChange={() => setWithStem(false)}
+              />
+              キーワードのみ（例: kw1_kw2.pdf）
+            </label>
+          </div>
+        </div>
+
         <div className="modal-field keyword-grid">
-          <label>キーワード 1</label>
+          <label>キーワード 1 <span className="required">*</span></label>
           <input
             type="text"
             value={kw1}
             onChange={(e) => setKw1(e.target.value)}
             className="filename-input"
-            placeholder="キーワード1"
+            placeholder="キーワード1（必須）"
           />
           <label>キーワード 2</label>
           <input
