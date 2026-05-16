@@ -7,7 +7,11 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+# 通常実行時のみ src/ を追加（PyInstaller バンドル内では launcher.py が解決済み）
+if not getattr(sys, "frozen", False):
+    _src = Path(__file__).parent.parent / "src"
+    if str(_src) not in sys.path:
+        sys.path.insert(0, str(_src))
 
 from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse

@@ -51,6 +51,11 @@ test:
 serve:
 	uvicorn web.app:app --host 0.0.0.0 --port $(PORT) --reload
 
+## exe ファイルをビルドする（Windows: build_exe.bat を使用）
+build-exe:
+	pip install pyinstaller -q
+	pyinstaller video_editor.spec --noconfirm
+
 ## 一時ファイルと出力ファイルを削除する
 clean:
 	rm -rf tmp/ uploads/ outputs/ $(OUTPUT) detection_preview.png
