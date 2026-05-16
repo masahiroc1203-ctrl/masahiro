@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>動画自動編集ツール</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Helvetica Neue", Arial, "Hiragino Sans", sans-serif;
+      background: #f5f6fa;
+      color: #2d3436;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 16px;
+    }
+
+    h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: #1a1a2e;
+    }
+
+    .subtitle {
+      color: #636e72;
+      font-size: 0.9rem;
+      margin-bottom: 32px;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.08);
+      padding: 32px;
+      width: 100%;
+      max-width: 600px;
+      margin-bottom: 24px;
+    }
+
+    .card h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #636e72;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: 20px;
+    }
+
+    /* ドロップゾーン */
+    .drop-zone {
+      border: 2px dashed #b2bec3;
+      border-radius: 8px;
+      padding: 40px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .2s, background .2s;
+    }
+    .drop-zone:hover, .drop-zone.dragover {
+      border-color: #0984e3;
+      background: #f0f8ff;
+    }
+    .drop-zone .icon { font-size: 2.5rem; margin-bottom: 10px; }
+    .drop-zone .label { color: #636e72; font-size: 0.9rem; }
+    .drop-zone .selected { color: #0984e3; font-weight: 600; margin-top: 8px; }
+
+    /* フォーム */
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 20px;
+    }
+    .form-grid .full { grid-column: 1 / -1; }
+
+    label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #636e72;
+      margin-bottom: 6px;
+    }
+    .hint { font-weight: 400; color: #b2bec3; font-size: 0.75rem; }
+
+    input[type="number"], input[type="text"] {
+      width: 100%;
+      border: 1.5px solid #dfe6e9;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 0.95rem;
+      transition: border-color .2s;
+      outline: none;
+    }
+    input:focus { border-color: #0984e3; }
+
+    /* ボタン */
+    .btn {
+      width: 100%;
+      padding: 13px;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity .2s, transform .1s;
+    }
+    .btn:active { transform: scale(.98); }
+    .btn-primary { background: #0984e3; color: #fff; margin-top: 24px; }
+    .btn-primary:disabled { background: #b2bec3; cursor: not-allowed; }
+    .btn-download { background: #00b894; color: #fff; margin-top: 12px; display: none; }
+
+    /* プログレス */
+    #progress-section { display: none; }
+    .progress-bar-wrap {
+      background: #dfe6e9;
+      border-radius: 999px;
+      height: 10px;
+      overflow: hidden;
+      margin: 12px 0 6px;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      background: #0984e3;
+      border-radius: 999px;
+      transition: width .4s;
+      width: 0%;
+    }
+    .stage-label { font-size: 0.85rem; color: #636e72; }
+    .pct-label   { font-size: 0.85rem; color: #0984e3; font-weight: 700; float: right; }
+
+    /* 結果 */
+    #result-section { display: none; }
+    .result-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 4px;
+    }
+    .result-item {
+      background: #f5f6fa;
+      border-radius: 8px;
+      padding: 14px 16px;
+      text-align: center;
+    }
+    .result-item .num { font-size: 1.8rem; font-weight: 700; color: #0984e3; }
+    .result-item .lbl { font-size: 0.75rem; color: #636e72; margin-top: 2px; }
+
+    /* エラー */
+    .error-box {
+      background: #fff5f5;
+      border: 1.5px solid #ff7675;
+      border-radius: 8px;
+      padding: 14px 16px;
+      color: #d63031;
+      font-size: 0.88rem;
+      display: none;
+    }
+
+    /* ステップ説明 */
+    .steps {
+      display: flex;
+      gap: 0;
+      margin-bottom: 32px;
+      max-width: 600px;
+      width: 100%;
+    }
+    .step {
+      flex: 1;
+      text-align: center;
+      position: relative;
+    }
+    .step:not(:last-child)::after {
+      content: "";
+      position: absolute;
+      top: 16px; right: -1px;
+      width: 50%; height: 2px;
+      background: #dfe6e9;
+    }
+    .step-num {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      background: #dfe6e9;
+      color: #636e72;
+      font-weight: 700;
+      font-size: 0.85rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 6px;
+    }
+    .step-num.active { background: #0984e3; color: #fff; }
+    .step-lbl { font-size: 0.72rem; color: #636e72; display: block; }
+  </style>
+</head>
+<body>
+
+  <h1>動画自動編集ツール</h1>
+  <p class="subtitle">工場工程の連続撮影動画からサイクルを自動検出・切り出し・結合します</p>
+
+  <!-- ステップ表示 -->
+  <div class="steps">
+    <div class="step">
+      <div class="step-num active" id="sn1">1</div>
+      <span class="step-lbl">動画アップロード</span>
+    </div>
+    <div class="step">
+      <div class="step-num" id="sn2">2</div>
+      <span class="step-lbl">パラメータ設定</span>
+    </div>
+    <div class="step">
+      <div class="step-num" id="sn3">3</div>
+      <span class="step-lbl">処理中</span>
+    </div>
+    <div class="step">
+      <div class="step-num" id="sn4">4</div>
+      <span class="step-lbl">ダウンロード</span>
+    </div>
+  </div>
+
+  <!-- アップロード & 設定カード -->
+  <div class="card" id="form-card">
+    <h2>動画ファイルと設定</h2>
+
+    <!-- ドロップゾーン -->
+    <div class="drop-zone" id="drop-zone">
+      <div class="icon">🎬</div>
+      <div class="label">クリックまたはドラッグ＆ドロップで動画を選択</div>
+      <div class="label">MP4 / AVI / MOV 対応</div>
+      <div class="selected" id="file-name"></div>
+    </div>
+    <input type="file" id="file-input" accept="video/*" style="display:none">
+
+    <!-- パラメータ -->
+    <div class="form-grid">
+      <div>
+        <label>
+          基準フレーム番号
+          <span class="hint">— サイクル開始の瞬間</span>
+        </label>
+        <input type="number" id="ref-frame" value="0" min="0" step="1">
+      </div>
+      <div>
+        <label>
+          類似度閾値
+          <span class="hint">— 0〜1 (デフォルト 0.92)</span>
+        </label>
+        <input type="number" id="threshold" value="0.92" min="0" max="1" step="0.01">
+      </div>
+      <div>
+        <label>
+          切り出し開始 <span class="hint">（秒）</span>
+        </label>
+        <input type="number" id="start-offset" value="0.0" min="0" step="0.1">
+      </div>
+      <div>
+        <label>
+          切り出し終了 <span class="hint">（秒）</span>
+        </label>
+        <input type="number" id="end-offset" value="5.0" min="0.1" step="0.1">
+      </div>
+      <div class="full">
+        <label>
+          ナンバリングテキスト
+          <span class="hint">— {n}=番号 / {t}=タイムスタンプ</span>
+        </label>
+        <input type="text" id="overlay-text" value="Cycle {n}">
+      </div>
+    </div>
+
+    <button class="btn btn-primary" id="run-btn" disabled>処理を開始する</button>
+  </div>
+
+  <!-- プログレスカード -->
+  <div class="card" id="progress-section">
+    <h2>処理中</h2>
+    <div class="progress-bar-wrap">
+      <div class="progress-bar-fill" id="progress-fill"></div>
+    </div>
+    <span class="stage-label" id="stage-label">待機中...</span>
+    <span class="pct-label" id="pct-label">0%</span>
+  </div>
+
+  <!-- 結果カード -->
+  <div class="card" id="result-section">
+    <h2>処理完了</h2>
+    <div class="result-grid">
+      <div class="result-item">
+        <div class="num" id="res-cycles">—</div>
+        <div class="lbl">検出サイクル数</div>
+      </div>
+      <div class="result-item">
+        <div class="num" id="res-clips">—</div>
+        <div class="lbl">出力クリップ数</div>
+      </div>
+      <div class="result-item">
+        <div class="num" id="res-time">—</div>
+        <div class="lbl">処理時間（秒）</div>
+      </div>
+      <div class="result-item">
+        <div class="num" id="res-skipped">—</div>
+        <div class="lbl">スキップ数</div>
+      </div>
+    </div>
+    <div class="error-box" id="error-box"></div>
+    <button class="btn btn-download" id="download-btn">output.mp4 をダウンロード</button>
+    <button class="btn btn-primary" id="retry-btn" style="margin-top:12px; background:#636e72;">
+      別の動画を処理する
+    </button>
+  </div>
+
+<script>
+  let selectedFile = null;
+  let currentJobId  = null;
+  let pollTimer     = null;
+
+  // ---- ファイル選択 ----
+  const dropZone  = document.getElementById("drop-zone");
+  const fileInput = document.getElementById("file-input");
+  const fileName  = document.getElementById("file-name");
+  const runBtn    = document.getElementById("run-btn");
+
+  dropZone.addEventListener("click", () => fileInput.click());
+  fileInput.addEventListener("change", e => setFile(e.target.files[0]));
+
+  dropZone.addEventListener("dragover", e => { e.preventDefault(); dropZone.classList.add("dragover"); });
+  dropZone.addEventListener("dragleave", () => dropZone.classList.remove("dragover"));
+  dropZone.addEventListener("drop", e => {
+    e.preventDefault();
+    dropZone.classList.remove("dragover");
+    setFile(e.dataTransfer.files[0]);
+  });
+
+  function setFile(f) {
+    if (!f) return;
+    selectedFile = f;
+    fileName.textContent = f.name;
+    runBtn.disabled = false;
+    setStep(2);
+  }
+
+  // ---- 処理開始 ----
+  runBtn.addEventListener("click", async () => {
+    if (!selectedFile) return;
+
+    const fd = new FormData();
+    fd.append("video",         selectedFile);
+    fd.append("ref_frame",     document.getElementById("ref-frame").value);
+    fd.append("start_offset",  document.getElementById("start-offset").value);
+    fd.append("end_offset",    document.getElementById("end-offset").value);
+    fd.append("threshold",     document.getElementById("threshold").value);
+    fd.append("overlay_text",  document.getElementById("overlay-text").value);
+
+    runBtn.disabled = true;
+    runBtn.textContent = "アップロード中...";
+    setStep(3);
+    show("progress-section");
+
+    try {
+      const res  = await fetch("/api/process", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "サーバーエラー");
+      currentJobId = data.job_id;
+      pollTimer = setInterval(pollStatus, 1500);
+    } catch (err) {
+      showError(err.message);
+    }
+  });
+
+  // ---- ポーリング ----
+  async function pollStatus() {
+    try {
+      const res  = await fetch(`/api/status/${currentJobId}`);
+      const data = await res.json();
+
+      document.getElementById("progress-fill").style.width = data.progress + "%";
+      document.getElementById("stage-label").textContent   = data.stage;
+      document.getElementById("pct-label").textContent     = data.progress + "%";
+
+      if (data.status === "done") {
+        clearInterval(pollTimer);
+        showResult(data.result);
+      } else if (data.status === "error") {
+        clearInterval(pollTimer);
+        showError(data.error);
+      }
+    } catch (e) { /* 一時的なネットワークエラーは無視 */ }
+  }
+
+  // ---- 結果表示 ----
+  function showResult(result) {
+    setStep(4);
+    hide("progress-section");
+    show("result-section");
+    document.getElementById("res-cycles").textContent  = result.detected_cycles;
+    document.getElementById("res-clips").textContent   = result.extracted_segments;
+    document.getElementById("res-time").textContent    = result.processing_time_sec;
+    document.getElementById("res-skipped").textContent = result.skipped_cycles.length;
+
+    const dlBtn = document.getElementById("download-btn");
+    dlBtn.style.display = "block";
+    dlBtn.onclick = () => { window.location.href = `/api/download/${currentJobId}`; };
+  }
+
+  function showError(msg) {
+    hide("progress-section");
+    show("result-section");
+    const box = document.getElementById("error-box");
+    box.style.display = "block";
+    box.textContent = "エラー: " + msg;
+    runBtn.disabled = false;
+    runBtn.textContent = "処理を開始する";
+  }
+
+  // ---- リセット ----
+  document.getElementById("retry-btn").addEventListener("click", () => {
+    selectedFile  = null;
+    currentJobId  = null;
+    fileInput.value = "";
+    fileName.textContent = "";
+    runBtn.disabled  = true;
+    runBtn.textContent = "処理を開始する";
+    document.getElementById("error-box").style.display   = "none";
+    document.getElementById("download-btn").style.display = "none";
+    document.getElementById("progress-fill").style.width  = "0%";
+    hide("progress-section");
+    hide("result-section");
+    setStep(1);
+  });
+
+  // ---- ユーティリティ ----
+  function show(id) { document.getElementById(id).style.display = "block"; }
+  function hide(id) { document.getElementById(id).style.display = "none"; }
+
+  function setStep(n) {
+    [1,2,3,4].forEach(i => {
+      document.getElementById("sn"+i).classList.toggle("active", i <= n);
+    });
+  }
+</script>
+</body>
+</html>
