@@ -18,27 +18,25 @@ class SegmentExtractor:
         self._output_config = output_config
 
     def validate(self, boundary: CycleBoundary, video: VideoInfo) -> bool:
-        """オフセット指定がサイクル長に収まるか確認する。"""
-        cycle_duration = boundary.end_sec - boundary.start_sec
-        if self._config.end_offset_sec > cycle_duration:
+        """切り出し区間が動画の範囲内に収まるか確認する。"""
+        cut_end = boundary.start_sec + self._config.after_sec
+        if cut_end > video.duration_sec + 0.5:  # 0.5秒の余裕
             logger.warning(
-                f"Cycle {boundary.cycle_id}: 切り出し終了オフセット "
-                f"({self._config.end_offset_sec}秒) が "
-                f"サイクル長 ({cycle_duration:.2f}秒) を超えています。スキップします。"
+                f"Cycle {boundary.cycle_id}: 切り出し終了 ({cut_end:.2f}秒) が "
+                f"動画長 ({video.duration_sec:.2f}秒) を超えています。スキップします。"
             )
             return False
         return True
 
     def extract(self, boundary: CycleBoundary, video: VideoInfo) -> Segment:
         """1サイクル分の区間をFFmpegで切り出す。"""
-        cut_start = boundary.start_sec + self._config.start_offset_sec
-        cut_end = boundary.start_sec + self._config.end_offset_sec
+        cut_start = max(0.0, boundary.start_sec - self._config.before_sec)
+        cut_end = boundary.start_sec + self._config.after_sec
 
         temp_dir = Path(self._output_config.temp_dir)
         temp_dir.mkdir(parents=True, exist_ok=True)
-        clip_path = str(temp_dir / f"clip_{boundary.cycle_id:03d}.mp4")
+        clip_path = str(temp_dir / f"clip_{boundary.cycle_id:04d}.mp4")
 
-        # -ss を -i の後に置くことで精度優先の切り出しを行う
         cmd = [
             "ffmpeg",
             "-i", video.path,
@@ -60,8 +58,7 @@ class SegmentExtractor:
             )
 
         logger.debug(
-            f"Cycle {boundary.cycle_id}: "
-            f"{cut_start:.2f}秒 〜 {cut_end:.2f}秒 → {clip_path}"
+            f"Cycle {boundary.cycle_id}: {cut_start:.2f}秒〜{cut_end:.2f}秒 → {clip_path}"
         )
         return Segment(
             cycle_id=boundary.cycle_id,

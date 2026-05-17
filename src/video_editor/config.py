@@ -4,12 +4,13 @@ from pathlib import Path
 from typing import Literal, Optional, Tuple
 
 import yaml
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class InputConfig(BaseModel):
     video_path: Path
-    reference_frame: Optional[int] = None
+    reference_frame: Optional[int] = None       # フレーム番号（後方互換）
+    reference_time_sec: Optional[float] = None  # 動画の時刻（秒）← 優先
     auto_detect: bool = False
 
     @field_validator("video_path", mode="before")
@@ -20,23 +21,16 @@ class InputConfig(BaseModel):
 
 class CycleConfig(BaseModel):
     similarity_threshold: float = Field(0.92, ge=0.0, le=1.0)
-    min_cycle_frames: int = Field(30, ge=1)
+    min_cycle_frames: int = Field(30, ge=1)     # 内部処理用（フレーム数）
+    min_cycle_sec: Optional[float] = None       # 最小サイクル時間（秒）← pipeline で変換
     scan_stride: int = Field(5, ge=1)
     refine_window: int = Field(10, ge=0)
     similarity_method: Literal["histogram", "combined"] = "histogram"
 
 
 class ExtractionConfig(BaseModel):
-    start_offset_sec: float = Field(0.0, ge=0.0)
-    end_offset_sec: float
-
-    @model_validator(mode="after")
-    def end_after_start(self) -> "ExtractionConfig":
-        if self.end_offset_sec <= self.start_offset_sec:
-            raise ValueError(
-                "end_offset_sec は start_offset_sec より大きい値にしてください"
-            )
-        return self
+    before_sec: float = Field(0.0, ge=0.0)  # 検出フレームの何秒前から切り出すか
+    after_sec: float = Field(5.0, ge=0.1)   # 検出フレームの何秒後まで切り出すか
 
 
 class OverlayConfig(BaseModel):
@@ -69,7 +63,7 @@ class OutputConfig(BaseModel):
 class AppConfig(BaseModel):
     input: InputConfig
     cycle: CycleConfig = Field(default_factory=CycleConfig)
-    extraction: ExtractionConfig
+    extraction: ExtractionConfig = Field(default_factory=ExtractionConfig)
     overlay: OverlayConfig = Field(default_factory=OverlayConfig)
     output: OutputConfig
 
