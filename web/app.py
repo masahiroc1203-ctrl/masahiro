@@ -16,8 +16,8 @@ if not getattr(sys, "frozen", False):
         sys.path.insert(0, str(_src))
 
 import cv2
-from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse, Response
+from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from video_editor.config import (
@@ -36,6 +36,12 @@ from video_editor.pipeline import VideoEditingPipeline
 # ------------------------------------------------------------------ #
 
 app = FastAPI(title="動画自動編集ツール", docs_url=None, redoc_url=None)
+
+MAX_UPLOAD_BYTES = 4 * 1024 ** 3  # 4 GB
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    return JSONResponse(status_code=500, content={"detail": str(exc)})
 
 BASE_DIR = Path(__file__).parent
 _STATIC = BASE_DIR / "static"

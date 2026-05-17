@@ -429,19 +429,34 @@
     document.getElementById("run-btn").disabled = true;
 
     const fd = new FormData();
-    files.forEach(f => fd.append("videos", f));
+    let totalBytes = 0;
+    files.forEach(f => { fd.append("videos", f); totalBytes += f.size; });
+
+    // ファイルサイズ表示
+    const mb = (totalBytes / 1024 / 1024).toFixed(1);
+    document.querySelector("#drop-zone .hint").textContent = `アップロード中... (${mb} MB)`;
 
     try {
-      const res  = await fetch("/api/upload", { method: "POST", body: fd });
+      const controller = new AbortController();
+      const timeoutId  = setTimeout(() => controller.abort(), 300_000); // 5分
+      const res  = await fetch("/api/upload", { method: "POST", body: fd, signal: controller.signal });
+      clearTimeout(timeoutId);
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || "アップロード失敗");
 
       uploadId = data.upload_id;
       renderFileList(data.files);
+      document.querySelector("#drop-zone .hint").textContent =
+        "クリックまたはドラッグ＆ドロップで動画を選択\n複数ファイルはファイル名の昇順で処理されます";
       document.getElementById("preview-btn").disabled = false;
       document.getElementById("run-btn").disabled = false;
     } catch (e) {
-      alert("アップロードエラー: " + e.message);
+      const msg = e.name === "AbortError"
+        ? "アップロードがタイムアウトしました（5分超）。ファイルが大きすぎる可能性があります。"
+        : "アップロードエラー: " + e.message + "\nサーバーが起動しているか確認してください。";
+      alert(msg);
+      document.querySelector("#drop-zone .hint").textContent =
+        "クリックまたはドラッグ＆ドロップで動画を選択\n複数ファイルはファイル名の昇順で処理されます";
     } finally {
       document.getElementById("upload-spinner").style.display = "none";
     }
