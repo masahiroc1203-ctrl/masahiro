@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import csv
 import logging
 import re
 import shutil
@@ -86,6 +87,7 @@ class VideoEditingPipeline:
                 start_sec=b.start_sec,
                 end_sec=b.end_sec,
                 similarity_score=b.similarity_score,
+                source_file=video_path.name,
             )
             for i, b in enumerate(boundaries)
         ]
@@ -166,6 +168,9 @@ class VideoEditingPipeline:
                 if b.cycle_id not in {s.cycle_id for s in all_segments}
             ]
 
+            csv_path = output_path.with_suffix(".csv")
+            self._write_csv(all_boundaries, csv_path)
+
             return ProcessingResult(
                 input_path=str(sorted_paths),
                 output_path=str(final_path),
@@ -175,9 +180,22 @@ class VideoEditingPipeline:
                 cycle_boundaries=all_boundaries,
                 segments=all_segments,
                 processing_time_sec=time.time() - start_time,
+                csv_path=str(csv_path),
             )
         finally:
             shutil.rmtree(str(temp_dir), ignore_errors=True)
+
+    @staticmethod
+    def _write_csv(boundaries: List[CycleBoundary], csv_path: Path) -> None:
+        def fmt_time(sec: float) -> str:
+            m, s = divmod(int(sec), 60)
+            return f"{m}:{s:02d}"
+
+        with open(csv_path, "w", newline="", encoding="utf-8-sig") as f:
+            writer = csv.writer(f)
+            writer.writerow(["サイクル数", "ファイル名_時間"])
+            for b in boundaries:
+                writer.writerow([b.cycle_id, f"{b.source_file}_{fmt_time(b.start_sec)}"])
 
     # ------------------------------------------------------------------ #
     # 単一動画ショートカット（後方互換）

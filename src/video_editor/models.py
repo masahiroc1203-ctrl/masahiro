@@ -21,6 +21,7 @@ class CycleBoundary:
     start_sec: float
     end_sec: float
     similarity_score: float
+    source_file: str = ""
 
 
 @dataclass
@@ -44,3 +45,4 @@ class ProcessingResult:
     segments: List[Segment] = field(default_factory=list)
     processing_time_sec: float = 0.0
     warnings: List[str] = field(default_factory=list)
+    csv_path: str = ""

@@ -212,6 +212,20 @@
       margin-top: 12px;
       display: none;
     }
+    .btn-csv {
+      width: 100%;
+      padding: 11px;
+      border: 1.5px solid #00b894;
+      border-radius: 8px;
+      background: transparent;
+      color: #00b894;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 8px;
+      display: none;
+    }
+    .btn-csv:hover { background: #f0fdf9; }
     .btn-retry {
       width: 100%;
       padding: 11px;
@@ -390,7 +404,8 @@
       </div>
     </div>
     <button class="btn-download" id="download-btn">output.mp4 をダウンロード</button>
-    <button class="btn-retry" id="retry-btn">別の動画を処理する</button>
+    <button class="btn-csv"      id="csv-btn">cycles.csv をダウンロード</button>
+    <button class="btn-retry"    id="retry-btn">別の動画を処理する</button>
   </div>
 
 </div>
@@ -741,6 +756,10 @@
     const btn = document.getElementById("download-btn");
     btn.style.display = "block";
     btn.onclick = () => { window.location.href = `/api/download/${jobId}`; };
+
+    const csvBtn = document.getElementById("csv-btn");
+    csvBtn.style.display = "block";
+    csvBtn.onclick = () => { window.location.href = `/api/csv/${jobId}`; };
   }
 
   function showError(msg) {
@@ -765,6 +784,7 @@
     document.getElementById("roi-hint").style.display = "none";
     document.getElementById("error-box").style.display    = "none";
     document.getElementById("download-btn").style.display = "none";
+    document.getElementById("csv-btn").style.display      = "none";
     document.getElementById("progress-fill").style.width  = "0%";
     document.getElementById("preview-btn").disabled = true;
     document.getElementById("run-btn").disabled     = true;

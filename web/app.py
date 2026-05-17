@@ -202,6 +202,19 @@ async def download(job_id: str) -> FileResponse:
     return FileResponse(str(output_path), media_type="video/mp4", filename="output.mp4")
 
 
+@app.get("/api/csv/{job_id}")
+async def download_csv(job_id: str) -> FileResponse:
+    if job_id not in _jobs:
+        raise HTTPException(status_code=404, detail="ジョブが見つかりません")
+    job = _jobs[job_id]
+    if job["status"] != "done":
+        raise HTTPException(status_code=400, detail="処理がまだ完了していません")
+    csv_path = Path(job["result"]["csv_path"])
+    if not csv_path.exists():
+        raise HTTPException(status_code=404, detail="CSVファイルが見つかりません")
+    return FileResponse(str(csv_path), media_type="text/csv", filename="cycles.csv")
+
+
 # ------------------------------------------------------------------ #
 # バックグラウンド処理
 # ------------------------------------------------------------------ #
@@ -256,6 +269,7 @@ def _run_pipeline(
                 "extracted_segments": result.extracted_segments,
                 "skipped_cycles": result.skipped_cycles,
                 "processing_time_sec": round(result.processing_time_sec, 1),
+                "csv_path": result.csv_path,
             },
         })
     except (VideoEditorError, Exception) as e:
