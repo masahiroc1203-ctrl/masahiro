@@ -7,6 +7,7 @@ from typing import Callable, List, Optional
 
 from .config import ExtractionConfig, OutputConfig
 from .exceptions import SegmentExtractionError
+from .ffmpeg_utils import find_ffmpeg
 from .models import CycleBoundary, Segment, VideoInfo
 
 logger = logging.getLogger(__name__)
@@ -38,7 +39,7 @@ class SegmentExtractor:
         clip_path = str(temp_dir / f"clip_{boundary.cycle_id:04d}.mp4")
 
         cmd = [
-            "ffmpeg",
+            find_ffmpeg(),
             "-i", video.path,
             "-ss", str(cut_start),
             "-to", str(cut_end),

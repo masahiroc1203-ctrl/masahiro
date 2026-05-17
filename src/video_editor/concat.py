@@ -7,6 +7,7 @@ from typing import Callable, List, Optional
 
 from .config import OutputConfig
 from .exceptions import ConcatError
+from .ffmpeg_utils import find_ffmpeg
 from .models import Segment
 
 logger = logging.getLogger(__name__)
@@ -39,7 +40,7 @@ class VideoConcat:
         self._write_concat_list(segments, list_path)
 
         cmd = [
-            "ffmpeg",
+            find_ffmpeg(),
             "-f", "concat",
             "-safe", "0",
             "-i", str(list_path),
