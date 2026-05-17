@@ -26,6 +26,7 @@ class CycleConfig(BaseModel):
     scan_stride: int = Field(5, ge=1)
     refine_window: int = Field(10, ge=0)
     similarity_method: Literal["histogram", "combined"] = "histogram"
+    roi: Optional[Tuple[float, float, float, float]] = None  # (x, y, w, h) 0-1の割合
 
 
 class ExtractionConfig(BaseModel):

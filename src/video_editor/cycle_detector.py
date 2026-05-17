@@ -27,8 +27,20 @@ class CycleDetector:
     def set_reference_frame(self, frame: np.ndarray) -> None:
         self._ref_hist = self._compute_histogram(frame)
 
+    def _apply_roi(self, frame: np.ndarray) -> np.ndarray:
+        if self._config.roi is None:
+            return frame
+        x_pct, y_pct, w_pct, h_pct = self._config.roi
+        fh, fw = frame.shape[:2]
+        x1 = int(x_pct * fw)
+        y1 = int(y_pct * fh)
+        x2 = int((x_pct + w_pct) * fw)
+        y2 = int((y_pct + h_pct) * fh)
+        cropped = frame[y1:y2, x1:x2]
+        return cropped if cropped.size > 0 else frame
+
     def _compute_histogram(self, frame: np.ndarray) -> np.ndarray:
-        small = cv2.resize(frame, (256, 256))
+        small = cv2.resize(self._apply_roi(frame), (256, 256))
         hsv = cv2.cvtColor(small, cv2.COLOR_BGR2HSV)
         h_hist = cv2.calcHist([hsv], [0], None, [50], [0, 180])
         s_hist = cv2.calcHist([hsv], [1], None, [60], [0, 256])

@@ -139,6 +139,10 @@ async def process_videos(
     threshold: float = Form(0.92),
     min_cycle_sec: float = Form(5.0),
     overlay_text: str = Form("Cycle {n}"),
+    roi_x: float = Form(0.0),
+    roi_y: float = Form(0.0),
+    roi_w: float = Form(1.0),
+    roi_h: float = Form(1.0),
 ) -> dict:
     if upload_id not in _uploads:
         raise HTTPException(status_code=404, detail="upload_id が見つかりません")
@@ -157,11 +161,13 @@ async def process_videos(
     upload = _uploads[upload_id]
     video_paths = [Path(upload["dir"]) / f for f in upload["files"]]
 
+    roi = (roi_x, roi_y, roi_w, roi_h) if (roi_w < 0.999 or roi_h < 0.999) else None
+
     background_tasks.add_task(
         _run_pipeline,
         job_id, video_paths, output_path,
         ref_time_sec, before_sec, after_sec,
-        threshold, min_cycle_sec, overlay_text,
+        threshold, min_cycle_sec, overlay_text, roi,
     )
     return {"job_id": job_id}
 
@@ -205,6 +211,7 @@ def _run_pipeline(
     threshold: float,
     min_cycle_sec: float,
     overlay_text: str,
+    roi: tuple | None = None,
 ) -> None:
     def on_progress(stage: str, pct: float) -> None:
         _jobs[job_id]["stage"] = stage
@@ -219,6 +226,7 @@ def _run_pipeline(
             cycle=CycleConfig(
                 similarity_threshold=threshold,
                 min_cycle_sec=min_cycle_sec,
+                roi=roi,
             ),
             extraction=ExtractionConfig(
                 before_sec=before_sec,

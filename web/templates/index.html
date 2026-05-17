@@ -28,14 +28,29 @@
       padding: 24px;
       margin-bottom: 16px;
     }
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
     .card-title {
       font-size: 0.75rem;
       font-weight: 700;
       letter-spacing: .08em;
       text-transform: uppercase;
       color: #b2bec3;
-      margin-bottom: 16px;
     }
+    .btn-clear-top {
+      font-size: 0.75rem;
+      color: #636e72;
+      background: none;
+      border: 1px solid #dfe6e9;
+      border-radius: 5px;
+      padding: 3px 10px;
+      cursor: pointer;
+    }
+    .btn-clear-top:hover { background: #f5f6fa; color: #d63031; border-color: #ff7675; }
 
     /* ---- ドロップゾーン ---- */
     .drop-zone {
@@ -50,7 +65,6 @@
     .drop-zone .icon { font-size: 2.2rem; margin-bottom: 8px; }
     .drop-zone .hint { color: #636e72; font-size: 0.85rem; line-height: 1.6; }
 
-    /* アップロード中スピナー */
     .spinner {
       display: none;
       width: 24px; height: 24px;
@@ -62,7 +76,6 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ファイルリスト */
     .file-list { margin-top: 14px; }
     .file-item {
       display: flex;
@@ -107,7 +120,6 @@
     }
     input:focus { border-color: #0984e3; }
 
-    /* 基準時刻 + プレビュー */
     .ref-row {
       display: grid;
       grid-template-columns: 1fr auto;
@@ -128,7 +140,7 @@
     .btn-preview:hover { background: #f0f8ff; }
     .btn-preview:disabled { opacity: .4; cursor: not-allowed; }
 
-    /* フレームプレビュー */
+    /* ---- ROI Canvas ---- */
     .preview-wrap {
       margin-top: 12px;
       display: none;
@@ -136,15 +148,37 @@
       overflow: hidden;
       border: 1.5px solid #dfe6e9;
       background: #000;
-      text-align: center;
+      position: relative;
     }
-    .preview-wrap img { width: 100%; display: block; }
-    .preview-label {
-      padding: 4px 8px;
+    #roi-canvas {
+      display: block;
+      width: 100%;
+      cursor: crosshair;
+      user-select: none;
+    }
+    .preview-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 5px 8px;
+      background: #f5f6fa;
+    }
+    .preview-label { font-size: 0.72rem; color: #636e72; }
+    .roi-info { font-size: 0.72rem; color: #0984e3; font-weight: 600; }
+    .btn-roi-clear {
       font-size: 0.72rem;
       color: #636e72;
-      text-align: right;
-      background: #f5f6fa;
+      background: none;
+      border: 1px solid #dfe6e9;
+      border-radius: 4px;
+      padding: 2px 8px;
+      cursor: pointer;
+    }
+    .btn-roi-clear:hover { color: #d63031; border-color: #ff7675; }
+    .roi-hint {
+      font-size: 0.72rem;
+      color: #b2bec3;
+      margin-top: 5px;
     }
 
     /* 2カラムグリッド */
@@ -231,6 +265,9 @@
       font-size: 0.85rem;
       display: none;
       margin-bottom: 8px;
+      word-break: break-all;
+      max-height: 200px;
+      overflow-y: auto;
     }
   </style>
 </head>
@@ -242,7 +279,10 @@
 
   <!-- ① 動画アップロード -->
   <div class="card">
-    <div class="card-title">① 動画ファイル（複数可）</div>
+    <div class="card-header">
+      <div class="card-title">① 動画ファイル（複数可）</div>
+      <button class="btn-clear-top" id="clear-btn">クリア</button>
+    </div>
     <div class="drop-zone" id="drop-zone">
       <div class="icon">🎬</div>
       <div class="hint">
@@ -257,7 +297,7 @@
 
   <!-- ② 基準フレーム -->
   <div class="card">
-    <div class="card-title">② 基準フレーム（サイクル開始の瞬間）</div>
+    <div class="card-title" style="margin-bottom:16px">② 基準フレーム（サイクル開始の瞬間）</div>
     <div class="field">
       <label>基準時刻 <span class="label-hint">— 動画内でサイクルが始まる時刻</span></label>
       <div class="ref-row">
@@ -269,14 +309,21 @@
       </div>
     </div>
     <div class="preview-wrap" id="preview-wrap">
-      <img id="preview-img" src="" alt="preview">
-      <div class="preview-label" id="preview-label"></div>
+      <canvas id="roi-canvas"></canvas>
+      <div class="preview-footer">
+        <span class="preview-label" id="preview-label"></span>
+        <span class="roi-info" id="roi-info"></span>
+        <button class="btn-roi-clear" id="roi-clear-btn" style="display:none">ROIをクリア</button>
+      </div>
+    </div>
+    <div class="roi-hint" id="roi-hint" style="display:none">
+      画像をドラッグして検出エリアを絞り込めます（未選択=全体）
     </div>
   </div>
 
   <!-- ③ パラメータ -->
   <div class="card">
-    <div class="card-title">③ 切り出し設定</div>
+    <div class="card-title" style="margin-bottom:16px">③ 切り出し設定</div>
 
     <div class="grid2">
       <div class="field">
@@ -310,7 +357,7 @@
 
   <!-- ④ 進捗 -->
   <div class="card" id="progress-card">
-    <div class="card-title">④ 処理中</div>
+    <div class="card-title" style="margin-bottom:0">④ 処理中</div>
     <div class="progress-bar-wrap">
       <div class="progress-bar-fill" id="progress-fill"></div>
     </div>
@@ -322,7 +369,7 @@
 
   <!-- ⑤ 結果 -->
   <div class="card" id="result-card">
-    <div class="card-title">⑤ 完了</div>
+    <div class="card-title" style="margin-bottom:16px">⑤ 完了</div>
     <div class="error-box" id="error-box"></div>
     <div class="stat-grid">
       <div class="stat-item">
@@ -354,6 +401,11 @@
   let pollTimer  = null;
   let previewDebounce = null;
 
+  // ROI state (fraction 0-1 of original image)
+  let roi = null;  // {x, y, w, h} as fractions
+  let _imgNaturalW = 1, _imgNaturalH = 1;
+  let _currentFrameUrl = null;
+
   // ---- ファイル選択 ----
   const dropZone  = document.getElementById("drop-zone");
   const fileInput = document.getElementById("file-input");
@@ -371,7 +423,6 @@
   async function handleFiles(files) {
     if (!files.length) return;
 
-    // アップロード開始
     document.getElementById("upload-spinner").style.display = "block";
     document.getElementById("file-list").innerHTML = "";
     document.getElementById("preview-btn").disabled = true;
@@ -409,13 +460,10 @@
   // ---- 基準フレームプレビュー ----
   const previewBtn  = document.getElementById("preview-btn");
   const previewWrap = document.getElementById("preview-wrap");
-  const previewImg  = document.getElementById("preview-img");
   const previewLbl  = document.getElementById("preview-label");
   const refTimeEl   = document.getElementById("ref-time");
 
   previewBtn.addEventListener("click", () => fetchPreview());
-
-  // 時刻入力変更で自動プレビュー（500ms デバウンス）
   refTimeEl.addEventListener("input", () => {
     clearTimeout(previewDebounce);
     if (!uploadId) return;
@@ -429,11 +477,188 @@
       const res = await fetch(`/api/frame/${uploadId}?time_sec=${t}`);
       if (!res.ok) return;
       const blob = await res.blob();
-      previewImg.src = URL.createObjectURL(blob);
-      previewWrap.style.display = "block";
-      previewLbl.textContent = `基準フレーム（${t.toFixed(1)} 秒）`;
+      const url  = URL.createObjectURL(blob);
+      _currentFrameUrl = url;
+      drawCanvas(url, () => {
+        previewWrap.style.display = "block";
+        document.getElementById("roi-hint").style.display = "block";
+        previewLbl.textContent = `基準フレーム（${t.toFixed(1)} 秒）`;
+      });
     } catch (e) { /* 無視 */ }
   }
+
+  // ---- Canvas + ROI ----
+  const canvas = document.getElementById("roi-canvas");
+  const ctx    = canvas.getContext("2d");
+  let _img     = null;
+  let dragging = false;
+  let dragStart = null;
+  let dragCurrent = null;
+
+  function drawCanvas(url, onLoad) {
+    const img = new Image();
+    img.onload = () => {
+      _img = img;
+      _imgNaturalW = img.naturalWidth;
+      _imgNaturalH = img.naturalHeight;
+      canvas.width  = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      redraw();
+      if (onLoad) onLoad();
+    };
+    img.src = url;
+  }
+
+  function redraw() {
+    if (!_img) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(_img, 0, 0);
+
+    const r = _getRoiPixels();
+    if (r) {
+      ctx.fillStyle   = "rgba(9,132,227,0.12)";
+      ctx.fillRect(r.x, r.y, r.w, r.h);
+      ctx.strokeStyle = "#0984e3";
+      ctx.lineWidth   = 2;
+      ctx.setLineDash([6, 3]);
+      ctx.strokeRect(r.x, r.y, r.w, r.h);
+      ctx.setLineDash([]);
+    }
+  }
+
+  function _getRoiPixels() {
+    if (dragging && dragStart && dragCurrent) {
+      return _normalizeRect(dragStart, dragCurrent);
+    }
+    if (roi) {
+      return {
+        x: roi.x * _imgNaturalW,
+        y: roi.y * _imgNaturalH,
+        w: roi.w * _imgNaturalW,
+        h: roi.h * _imgNaturalH,
+      };
+    }
+    return null;
+  }
+
+  function _normalizeRect(a, b) {
+    return {
+      x: Math.min(a.x, b.x),
+      y: Math.min(a.y, b.y),
+      w: Math.abs(a.x - b.x),
+      h: Math.abs(a.y - b.y),
+    };
+  }
+
+  function _canvasCoords(e) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width  / rect.width;
+    const scaleY = canvas.height / rect.height;
+    return {
+      x: (e.clientX - rect.left) * scaleX,
+      y: (e.clientY - rect.top)  * scaleY,
+    };
+  }
+
+  canvas.addEventListener("mousedown", e => {
+    if (e.button !== 0) return;
+    dragging   = true;
+    dragStart  = _canvasCoords(e);
+    dragCurrent = dragStart;
+    roi = null;
+    updateRoiUI();
+  });
+
+  canvas.addEventListener("mousemove", e => {
+    if (!dragging) return;
+    dragCurrent = _canvasCoords(e);
+    redraw();
+  });
+
+  canvas.addEventListener("mouseup", e => {
+    if (!dragging) return;
+    dragging = false;
+    const r = _normalizeRect(dragStart, _canvasCoords(e));
+    if (r.w > 5 && r.h > 5) {
+      roi = {
+        x: r.x / _imgNaturalW,
+        y: r.y / _imgNaturalH,
+        w: r.w / _imgNaturalW,
+        h: r.h / _imgNaturalH,
+      };
+    } else {
+      roi = null;
+    }
+    dragStart = dragCurrent = null;
+    redraw();
+    updateRoiUI();
+  });
+
+  canvas.addEventListener("mouseleave", e => {
+    if (dragging) {
+      dragging = false;
+      dragStart = dragCurrent = null;
+      redraw();
+    }
+  });
+
+  // タッチ対応
+  canvas.addEventListener("touchstart", e => {
+    e.preventDefault();
+    dragging   = true;
+    dragStart  = _canvasCoords(e.touches[0]);
+    dragCurrent = dragStart;
+    roi = null;
+    updateRoiUI();
+  }, { passive: false });
+
+  canvas.addEventListener("touchmove", e => {
+    e.preventDefault();
+    if (!dragging) return;
+    dragCurrent = _canvasCoords(e.touches[0]);
+    redraw();
+  }, { passive: false });
+
+  canvas.addEventListener("touchend", e => {
+    if (!dragging) return;
+    dragging = false;
+    const r = _normalizeRect(dragStart, dragCurrent || dragStart);
+    if (r.w > 5 && r.h > 5) {
+      roi = {
+        x: r.x / _imgNaturalW,
+        y: r.y / _imgNaturalH,
+        w: r.w / _imgNaturalW,
+        h: r.h / _imgNaturalH,
+      };
+    } else {
+      roi = null;
+    }
+    dragStart = dragCurrent = null;
+    redraw();
+    updateRoiUI();
+  });
+
+  function updateRoiUI() {
+    const info    = document.getElementById("roi-info");
+    const clearBtn = document.getElementById("roi-clear-btn");
+    if (roi) {
+      const xp = Math.round(roi.x * 100);
+      const yp = Math.round(roi.y * 100);
+      const wp = Math.round(roi.w * 100);
+      const hp = Math.round(roi.h * 100);
+      info.textContent = `ROI: ${xp}%, ${yp}% / ${wp}%×${hp}%`;
+      clearBtn.style.display = "inline-block";
+    } else {
+      info.textContent = "";
+      clearBtn.style.display = "none";
+    }
+  }
+
+  document.getElementById("roi-clear-btn").addEventListener("click", () => {
+    roi = null;
+    redraw();
+    updateRoiUI();
+  });
 
   // ---- 処理開始 ----
   document.getElementById("run-btn").addEventListener("click", async () => {
@@ -446,6 +671,13 @@
     fd.append("threshold",     document.getElementById("threshold").value);
     fd.append("min_cycle_sec", document.getElementById("min-cycle").value);
     fd.append("overlay_text",  document.getElementById("overlay-text").value);
+
+    if (roi) {
+      fd.append("roi_x", roi.x.toFixed(4));
+      fd.append("roi_y", roi.y.toFixed(4));
+      fd.append("roi_w", roi.w.toFixed(4));
+      fd.append("roi_h", roi.h.toFixed(4));
+    }
 
     document.getElementById("run-btn").disabled = true;
     show("progress-card");
@@ -505,20 +737,29 @@
     document.getElementById("run-btn").disabled = false;
   }
 
-  // ---- リセット ----
-  document.getElementById("retry-btn").addEventListener("click", () => {
+  // ---- クリア ----
+  function resetAll() {
+    clearInterval(pollTimer);
     uploadId = jobId = null;
+    roi = null;
+    _img = null;
+    _currentFrameUrl = null;
     fileInput.value = "";
-    document.getElementById("file-list").innerHTML = "";
+    document.getElementById("file-list").innerHTML    = "";
     document.getElementById("preview-wrap").style.display = "none";
+    document.getElementById("roi-hint").style.display = "none";
     document.getElementById("error-box").style.display    = "none";
     document.getElementById("download-btn").style.display = "none";
     document.getElementById("progress-fill").style.width  = "0%";
     document.getElementById("preview-btn").disabled = true;
-    document.getElementById("run-btn").disabled = true;
+    document.getElementById("run-btn").disabled     = true;
+    updateRoiUI();
     hide("progress-card");
     hide("result-card");
-  });
+  }
+
+  document.getElementById("clear-btn").addEventListener("click", resetAll);
+  document.getElementById("retry-btn").addEventListener("click", resetAll);
 
   function show(id) { document.getElementById(id).style.display = "block"; }
   function hide(id) { document.getElementById(id).style.display = "none"; }
