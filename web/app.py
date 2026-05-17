@@ -215,6 +215,28 @@ async def download_csv(job_id: str) -> FileResponse:
     return FileResponse(str(csv_path), media_type="text/csv", filename="cycles.csv")
 
 
+# ---- クリーンアップ ----
+
+@app.delete("/api/cleanup")
+async def cleanup(upload_id: str = "", job_id: str = "") -> dict:
+    deleted = []
+
+    if upload_id and upload_id in _uploads:
+        upload_dir = Path(_uploads[upload_id]["dir"])
+        shutil.rmtree(str(upload_dir), ignore_errors=True)
+        del _uploads[upload_id]
+        deleted.append(f"uploads/{upload_id}")
+
+    if job_id and job_id in _jobs:
+        for suffix in ("_output.mp4", "_output.csv"):
+            p = OUTPUT_DIR / f"{job_id}{suffix}"
+            p.unlink(missing_ok=True)
+        del _jobs[job_id]
+        deleted.append(f"outputs/{job_id}")
+
+    return {"deleted": deleted}
+
+
 # ------------------------------------------------------------------ #
 # バックグラウンド処理
 # ------------------------------------------------------------------ #

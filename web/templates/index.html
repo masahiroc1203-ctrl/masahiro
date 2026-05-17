@@ -772,8 +772,17 @@
   }
 
   // ---- クリア ----
-  function resetAll() {
+  async function resetAll() {
     clearInterval(pollTimer);
+
+    // サーバー側のファイルを削除
+    if (uploadId || jobId) {
+      const params = new URLSearchParams();
+      if (uploadId) params.set("upload_id", uploadId);
+      if (jobId)    params.set("job_id",    jobId);
+      fetch(`/api/cleanup?${params}`, { method: "DELETE" }).catch(() => {});
+    }
+
     uploadId = jobId = null;
     roi = null;
     _img = null;
