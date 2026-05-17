@@ -122,7 +122,7 @@ class VideoEditingPipeline:
         )
 
         loader.release()
-        return renumbered, segments
+        return renumbered, segments, video.duration_sec
 
     # ------------------------------------------------------------------ #
     # 複数動画処理（メインエントリ）
@@ -150,6 +150,9 @@ class VideoEditingPipeline:
         all_boundaries: List[CycleBoundary] = []
         all_segments: List[Segment] = []
         global_offset = 0
+        # 各動画のグローバル開始時刻（累積）を記録
+        file_global_offset: dict[str, float] = {}
+        cumulative_sec = 0.0
 
         def make_cb(vi: int):
             def cb(stage: str, pct: float) -> None:
@@ -160,20 +163,36 @@ class VideoEditingPipeline:
 
         try:
             for vi, vpath in enumerate(sorted_paths):
+                file_global_offset[vpath.name] = cumulative_sec
                 try:
-                    boundaries, segments = self._process_single(
+                    boundaries, segments, duration = self._process_single(
                         vpath, global_offset, make_cb(vi), shared_ref_frame
                     )
                 except CycleDetectionError as e:
                     logger.warning(f"{vpath.name}: {e} → スキップ")
+                    # 動画長だけは加算（スキップしても時刻は進む）
+                    from .loader import VideoLoader as _VL
+                    try:
+                        _ldr = _VL(); _vid = _ldr.load(str(vpath))
+                        cumulative_sec += _vid.duration_sec; _ldr.release()
+                    except Exception:
+                        pass
                     continue
 
                 all_boundaries.extend(boundaries)
                 all_segments.extend(segments)
                 global_offset += len(boundaries)
+                cumulative_sec += duration
 
             if not all_segments:
                 raise CycleDetectionError("全ての動画でサイクルが検出できませんでした")
+
+            # ---- 動画ファイル間でも min_cycle_sec を適用 ----
+            min_cyc = self._config.cycle.min_cycle_sec
+            if min_cyc is not None and len(sorted_paths) > 1:
+                all_boundaries, all_segments = self._filter_cross_video(
+                    all_boundaries, all_segments, file_global_offset, min_cyc
+                )
 
             # ナンバリングオーバーレイ
             if progress_callback:
@@ -210,6 +229,52 @@ class VideoEditingPipeline:
             )
         finally:
             shutil.rmtree(str(temp_dir), ignore_errors=True)
+
+    @staticmethod
+    def _filter_cross_video(
+        boundaries: List[CycleBoundary],
+        segments: List[Segment],
+        file_global_offset: dict,
+        min_cycle_sec: float,
+    ) -> tuple[List[CycleBoundary], List[Segment]]:
+        """動画ファイル境界をまたいでも min_cycle_sec を適用して重複検出を除去し、連番を振り直す。"""
+        kept: List[CycleBoundary] = []
+        last_global_sec = -float("inf")
+
+        for b in boundaries:
+            global_sec = file_global_offset.get(b.source_file, 0.0) + b.start_sec
+            if global_sec - last_global_sec >= min_cycle_sec:
+                kept.append(b)
+                last_global_sec = global_sec
+            else:
+                logger.info(
+                    f"Cycle {b.cycle_id} ({b.source_file} {b.start_sec:.1f}s) を"
+                    f"min_cycle_sec={min_cycle_sec}s でフィルタ（前サイクルから"
+                    f"{global_sec - last_global_sec:.1f}s）"
+                )
+
+        # cycle_id を 1 から振り直す
+        old_to_new = {b.cycle_id: i + 1 for i, b in enumerate(kept)}
+        renumbered_b = [
+            CycleBoundary(
+                cycle_id=old_to_new[b.cycle_id],
+                start_frame=b.start_frame, end_frame=b.end_frame,
+                start_sec=b.start_sec, end_sec=b.end_sec,
+                similarity_score=b.similarity_score, source_file=b.source_file,
+            )
+            for b in kept
+        ]
+        kept_ids = set(old_to_new)
+        renumbered_s = [
+            Segment(
+                cycle_id=old_to_new[s.cycle_id],
+                source_start_frame=s.source_start_frame, source_end_frame=s.source_end_frame,
+                source_start_sec=s.source_start_sec, source_end_sec=s.source_end_sec,
+                clip_path=s.clip_path,
+            )
+            for s in segments if s.cycle_id in kept_ids
+        ]
+        return renumbered_b, renumbered_s
 
     @staticmethod
     def _write_csv(boundaries: List[CycleBoundary], csv_path: Path) -> None:
