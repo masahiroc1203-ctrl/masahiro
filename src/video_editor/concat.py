@@ -20,8 +20,9 @@ class VideoConcat:
     def _write_concat_list(self, segments: List[Segment], list_path: Path) -> None:
         with open(list_path, "w", encoding="utf-8") as f:
             for segment in segments:
-                # パスのシングルクォートをエスケープ
-                escaped = segment.clip_path.replace("'", "'\\''")
+                # 絶対パス + Windowsバックスラッシュをスラッシュに統一
+                abs_path = Path(segment.clip_path).resolve().as_posix()
+                escaped = abs_path.replace("'", "\\'")
                 f.write(f"file '{escaped}'\n")
 
     def concat(
@@ -43,7 +44,7 @@ class VideoConcat:
             find_ffmpeg(),
             "-f", "concat",
             "-safe", "0",
-            "-i", str(list_path),
+            "-i", str(list_path.resolve()),
             "-c", "copy",
             "-y", str(output_path),
         ]

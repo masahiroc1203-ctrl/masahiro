@@ -34,7 +34,7 @@ class SegmentExtractor:
         cut_start = max(0.0, boundary.start_sec - self._config.before_sec)
         cut_end = boundary.start_sec + self._config.after_sec
 
-        temp_dir = Path(self._output_config.temp_dir)
+        temp_dir = Path(self._output_config.temp_dir).resolve()
         temp_dir.mkdir(parents=True, exist_ok=True)
         clip_path = str(temp_dir / f"clip_{boundary.cycle_id:04d}.mp4")
 
