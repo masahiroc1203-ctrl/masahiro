@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import logging
 import subprocess
+import sys
 from datetime import timedelta
 from pathlib import Path
-from typing import Callable, List
+from typing import Callable, List, Optional
 
 from .config import OverlayConfig
 from .exceptions import OverlayError
+from .ffmpeg_utils import find_ffmpeg
 from .models import Segment
 
 logger = logging.getLogger(__name__)
@@ -18,6 +20,20 @@ _POSITION_MAP = {
     "bottom-left":  "x={m}:y=h-text_h-{m}",
     "bottom-right": "x=w-text_w-{m}:y=h-text_h-{m}",
 }
+
+_WINDOWS_FONT_CANDIDATES = [
+    r"C:/Windows/Fonts/arial.ttf",
+    r"C:/Windows/Fonts/Arial.ttf",
+    r"C:/Windows/Fonts/segoeui.ttf",
+    r"C:/Windows/Fonts/calibri.ttf",
+]
+
+
+def _find_windows_font() -> str | None:
+    for p in _WINDOWS_FONT_CANDIDATES:
+        if Path(p).exists():
+            return p
+    return None
 
 
 def _escape(text: str) -> str:
@@ -51,6 +67,13 @@ class NumberingOverlay:
             pos,
         ]
 
+        # Windowsではフォントファイルを明示しないとfontconfig errorになる
+        if sys.platform == "win32":
+            font_path = _find_windows_font()
+            if font_path:
+                escaped_font = font_path.replace("\\", "/").replace(":", "\\:")
+                parts.insert(1, f"fontfile='{escaped_font}'")
+
         if cfg.background_color is not None:
             br, bg, bb = cfg.background_color
             bg_hex = f"#{br:02x}{bg:02x}{bb:02x}"
@@ -73,7 +96,7 @@ class NumberingOverlay:
         output_path = str(Path(input_path).with_suffix("")) + "_ov.mp4"
 
         cmd = [
-            "ffmpeg",
+            find_ffmpeg(),
             "-i", input_path,
             "-vf", vf,
             "-c:v", "libx264",
