@@ -72,7 +72,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name="動画編集ツール",
+    name="VideoEditTool",
     debug=False,
     strip=False,
     upx=True,
@@ -88,5 +88,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name="動画編集ツール",
+    name="VideoEditTool",
 )

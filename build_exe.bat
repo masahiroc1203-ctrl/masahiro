@@ -1,78 +1,76 @@
 @echo off
-chcp 65001 > nul
+setlocal
+
 echo ============================================
-echo   動画自動編集ツール　ビルドスクリプト
+echo   Build Script - Video Editing Tool
 echo ============================================
 echo.
 
-:: Python 確認
+:: Python check
 python --version > nul 2>&1
 if errorlevel 1 (
-    echo [ERROR] Python が見つかりません。
-    echo https://www.python.org/ からインストールしてください。
+    echo ERROR: Python not found.
+    echo Please install Python from https://www.python.org/
     pause & exit /b 1
 )
 
-:: 依存ライブラリのインストール
-echo [1/4] ライブラリをインストール中...
+:: Step 1: Install libraries
+echo Step 1/4: Installing libraries...
 pip install -r requirements.txt -q
+if errorlevel 1 (
+    echo ERROR: pip install failed.
+    pause & exit /b 1
+)
 pip install pyinstaller -q
-echo       完了
+if errorlevel 1 (
+    echo ERROR: pyinstaller install failed.
+    pause & exit /b 1
+)
+echo Done.
 
-:: FFmpeg の確認・ダウンロード
-echo [2/4] FFmpeg を確認中...
+:: Step 2: FFmpeg check / download
+echo Step 2/4: Checking FFmpeg...
 if exist "ffmpeg\ffmpeg.exe" (
-    echo       ffmpeg\ffmpeg.exe が見つかりました
+    echo ffmpeg\ffmpeg.exe found.
 ) else (
-    echo       FFmpeg が見つかりません。ダウンロード中...
+    echo FFmpeg not found. Downloading...
     if not exist "ffmpeg" mkdir ffmpeg
-    powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-        "$url='https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip';" ^
-        "$zip='ffmpeg_tmp.zip';" ^
-        "Write-Host '  ダウンロード中 (数十秒かかります)...';" ^
-        "Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing;" ^
-        "Write-Host '  展開中...';" ^
-        "Expand-Archive -Path $zip -DestinationPath 'ffmpeg_extract' -Force;" ^
-        "$exe=Get-ChildItem 'ffmpeg_extract' -Recurse -Filter 'ffmpeg.exe' | Select-Object -First 1;" ^
-        "Copy-Item $exe.FullName 'ffmpeg\ffmpeg.exe';" ^
-        "Remove-Item $zip -Force;" ^
-        "Remove-Item 'ffmpeg_extract' -Recurse -Force;" ^
-        "Write-Host '  FFmpeg の準備完了'"
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "$url='https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip'; $zip='ffmpeg_tmp.zip'; Write-Host 'Downloading...'; Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing; Write-Host 'Extracting...'; Expand-Archive -Path $zip -DestinationPath 'ffmpeg_extract' -Force; $exe=Get-ChildItem 'ffmpeg_extract' -Recurse -Filter 'ffmpeg.exe' | Select-Object -First 1; Copy-Item $exe.FullName 'ffmpeg\ffmpeg.exe'; Remove-Item $zip -Force; Remove-Item 'ffmpeg_extract' -Recurse -Force; Write-Host 'FFmpeg ready.'"
     if errorlevel 1 (
-        echo [ERROR] FFmpeg のダウンロードに失敗しました。
-        echo 手動で以下からダウンロードし、ffmpeg\ フォルダに ffmpeg.exe を配置してください。
+        echo ERROR: FFmpeg download failed.
+        echo Please download manually from:
         echo https://github.com/BtbN/FFmpeg-Builds/releases
+        echo and place ffmpeg.exe into the ffmpeg\ folder.
         pause & exit /b 1
     )
 )
 
-:: ビルド
-echo [3/4] exe をビルド中 (数分かかります)...
-if exist "dist\動画編集ツール" rmdir /s /q "dist\動画編集ツール"
-pyinstaller video_editor.spec --noconfirm
+:: Step 3: Build exe
+echo Step 3/4: Building exe (this takes several minutes)...
+if exist "dist\VideoEditTool" rmdir /s /q "dist\VideoEditTool"
+python -m PyInstaller video_editor.spec --noconfirm
 if errorlevel 1 (
-    echo [ERROR] ビルドに失敗しました。
+    echo ERROR: Build failed.
     pause & exit /b 1
 )
-echo       完了
+echo Done.
 
-:: 後処理
-echo [4/4] 後処理...
-:: FFmpeg を dist フォルダにもコピー（同梱確認）
-if not exist "dist\動画編集ツール\ffmpeg" (
-    mkdir "dist\動画編集ツール\ffmpeg"
-    copy "ffmpeg\ffmpeg.exe" "dist\動画編集ツール\ffmpeg\" > nul
+:: Step 4: Copy FFmpeg into dist
+echo Step 4/4: Finalizing...
+if not exist "dist\VideoEditTool\ffmpeg" mkdir "dist\VideoEditTool\ffmpeg"
+if exist "ffmpeg\ffmpeg.exe" (
+    copy "ffmpeg\ffmpeg.exe" "dist\VideoEditTool\ffmpeg\" > nul
 )
-echo       完了
+echo Done.
 
 echo.
 echo ============================================
-echo   ビルド完了！
+echo   Build Complete!
 echo ============================================
 echo.
-echo   配布フォルダ: dist\動画編集ツール\
-echo   起動ファイル: dist\動画編集ツール\動画編集ツール.exe
+echo   Folder : dist\VideoEditTool\
+echo   Launch : dist\VideoEditTool\VideoEditTool.exe
 echo.
-echo   フォルダごと zip 圧縮して配布してください。
+echo   Zip the folder and share it.
 echo ============================================
 pause
