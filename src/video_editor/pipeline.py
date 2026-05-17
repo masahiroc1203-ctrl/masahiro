@@ -34,11 +34,30 @@ class VideoEditingPipeline:
     # 単一動画処理（内部共通処理）
     # ------------------------------------------------------------------ #
 
+    def _load_reference_frame(self, video_path: Path) -> np.ndarray:
+        """指定動画から基準フレームを1枚取り出して返す。"""
+        import numpy as np
+        loader = VideoLoader()
+        video = loader.load(str(video_path))
+        ref_time = self._config.input.reference_time_sec
+        if ref_time is not None:
+            ref_frame_num = min(int(ref_time * video.fps), video.total_frames - 1)
+        elif self._config.input.reference_frame is not None:
+            ref_frame_num = self._config.input.reference_frame
+        else:
+            raise ReferenceFrameError(
+                "reference_time_sec または reference_frame を指定してください"
+            )
+        frame = loader.get_frame(ref_frame_num)
+        loader.release()
+        return frame
+
     def _process_single(
         self,
         video_path: Path,
         global_cycle_offset: int,
         progress_callback: Optional[Callable[[str, float], None]],
+        shared_ref_frame=None,
     ) -> tuple[List[CycleBoundary], List[Segment]]:
         """1本の動画を処理してサイクル境界とセグメントを返す。"""
 
@@ -53,17 +72,20 @@ class VideoEditingPipeline:
             f"@ {video.fps:.1f}fps, {video.duration_sec:.1f}秒"
         )
 
-        # 基準フレームの決定（時刻 → フレーム番号に変換）
-        ref_time = self._config.input.reference_time_sec
-        if ref_time is not None:
-            ref_frame_num = min(int(ref_time * video.fps), video.total_frames - 1)
-        elif self._config.input.reference_frame is not None:
-            ref_frame_num = self._config.input.reference_frame
+        # 基準フレーム：共有フレームが渡された場合はそれを使う
+        if shared_ref_frame is not None:
+            ref_frame = shared_ref_frame
         else:
-            raise ReferenceFrameError(
-                "reference_time_sec または reference_frame を指定してください"
-            )
-        ref_frame = loader.get_frame(ref_frame_num)
+            ref_time = self._config.input.reference_time_sec
+            if ref_time is not None:
+                ref_frame_num = min(int(ref_time * video.fps), video.total_frames - 1)
+            elif self._config.input.reference_frame is not None:
+                ref_frame_num = self._config.input.reference_frame
+            else:
+                raise ReferenceFrameError(
+                    "reference_time_sec または reference_frame を指定してください"
+                )
+            ref_frame = loader.get_frame(ref_frame_num)
 
         # min_cycle_sec → min_cycle_frames に変換（動画ごとにFPSが異なる場合に対応）
         cycle_cfg = copy.copy(self._config.cycle)
@@ -120,6 +142,10 @@ class VideoEditingPipeline:
         sorted_paths = sorted(video_paths, key=lambda p: _natural_sort_key(p.name))
         logger.info(f"処理対象: {[p.name for p in sorted_paths]}")
 
+        # 1本目の動画から基準フレームを1枚だけ取り出して全動画で共有する
+        shared_ref_frame = self._load_reference_frame(sorted_paths[0])
+        logger.info(f"基準フレームを {sorted_paths[0].name} から取得（全動画共通）")
+
         n = len(sorted_paths)
         all_boundaries: List[CycleBoundary] = []
         all_segments: List[Segment] = []
@@ -136,7 +162,7 @@ class VideoEditingPipeline:
             for vi, vpath in enumerate(sorted_paths):
                 try:
                     boundaries, segments = self._process_single(
-                        vpath, global_offset, make_cb(vi)
+                        vpath, global_offset, make_cb(vi), shared_ref_frame
                     )
                 except CycleDetectionError as e:
                     logger.warning(f"{vpath.name}: {e} → スキップ")
