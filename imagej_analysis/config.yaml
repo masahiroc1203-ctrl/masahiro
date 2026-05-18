@@ -1,0 +1,5 @@
+# Fiji 実行ファイルのパス（環境に合わせて変更してください）
+# fiji_path: "/path/to/Fiji.app/ImageJ-linux64"       # Linux
+# fiji_path: "/Applications/Fiji.app/Contents/MacOS/ImageJ-macosx"  # macOS
+# fiji_path: "C:/Fiji.app/ImageJ-win64.exe"            # Windows
+fiji_path: "/path/to/Fiji.app/ImageJ-linux64"
