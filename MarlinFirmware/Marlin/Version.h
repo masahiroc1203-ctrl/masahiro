@@ -28,7 +28,7 @@
 /**
  * Marlin release version identifier
  */
-#define SHORT_BUILD_VERSION "2.1.x-Ender3Pro-BLTouch-v1.2"
+#define SHORT_BUILD_VERSION "2.1.x-Ender3Pro-BLTouch-v1.3"
 
 /**
  * Verbose version identifier which should contain a reference to the location
