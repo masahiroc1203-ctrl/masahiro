@@ -895,6 +895,10 @@ void GcodeSuite::process_parsed_command(bool no_ok/*=false*/) {
         case 421: M421(); break;                                  // M421: Set a Mesh Bed Leveling Z coordinate
       #endif
 
+      #if HAS_MEDIA && ENABLED(AUTO_BED_LEVELING_UBL)
+        case 424: M424(); break;                                  // M424: Save UBL bed mesh to SD card as CSV
+      #endif
+
       #if ENABLED(X_AXIS_TWIST_COMPENSATION)
         case 423: M423(); break;                                  // M423: Reset, modify, or report X-Twist Compensation data
       #endif
