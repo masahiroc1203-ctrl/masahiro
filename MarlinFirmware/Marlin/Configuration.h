@@ -2362,7 +2362,20 @@
   //=================================== Mesh ==================================
   //===========================================================================
 
-  #define MESH_INSET 10          // Set Mesh bounds as an inset region of the bed
+  // Mesh bounds: probe coordinates, accounting for nozzle-to-probe offset (-45, -5).
+  // When probing at (probe_x, probe_y), nozzle moves to (probe_x+45, probe_y+5).
+  // Constraints: nozzle must stay within X[0..245] and Y[0..235].
+  //   MESH_MAX_X: probe_x + 45 <= 245  →  probe_x <= 200  (use 190 for 10mm margin)
+  //   MESH_MAX_Y: probe_y + 5  <= 235  →  probe_y <= 230  (use 220 for 10mm margin)
+  //   MESH_MIN_X: 10mm inset from bed left edge (nozzle at X=55, within limits)
+  //   MESH_MIN_Y: 10mm inset from bed front edge (nozzle at Y=15, within limits)
+  // Resulting pitch (3-point grid):
+  //   X: (190 - 10) / 2 = 90mm  → probe at X = 10, 100, 190
+  //   Y: (220 - 10) / 2 = 105mm → probe at Y = 10, 115, 220
+  #define MESH_MIN_X 10
+  #define MESH_MAX_X 190
+  #define MESH_MIN_Y 10
+  #define MESH_MAX_Y 220
   #define GRID_MAX_POINTS_X 3
   #define GRID_MAX_POINTS_Y GRID_MAX_POINTS_X
 
