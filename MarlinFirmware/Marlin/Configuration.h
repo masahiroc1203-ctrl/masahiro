@@ -1733,7 +1733,12 @@
  *     |    [-]    |
  *     O-- FRONT --+
  */
-#define NOZZLE_TO_PROBE_OFFSET { -45, -5, -1.2 } // (mm) X, Y, Z distance from Nozzle tip to Probe trigger-point
+// Probe offset components (negative = probe is in that direction relative to nozzle)
+// Change these values here; MESH_MIN/MAX will adjust automatically.
+#define PROBE_X_OFFSET -45    // probe is 45mm to the LEFT  of the nozzle
+#define PROBE_Y_OFFSET  -5    // probe is  5mm in FRONT of the nozzle
+#define PROBE_Z_OFFSET  -1.2  // probe triggers 1.2mm below nozzle tip
+#define NOZZLE_TO_PROBE_OFFSET { PROBE_X_OFFSET, PROBE_Y_OFFSET, PROBE_Z_OFFSET } // (mm) X, Y, Z distance from Nozzle tip to Probe trigger-point
 
 // Enable and set to use a specific tool for probing. Disable to allow any tool.
 #define PROBING_TOOL 0
@@ -2362,20 +2367,20 @@
   //=================================== Mesh ==================================
   //===========================================================================
 
-  // Mesh bounds: probe coordinates, accounting for nozzle-to-probe offset (-45, -5).
-  // When probing at (probe_x, probe_y), nozzle moves to (probe_x+45, probe_y+5).
-  // Constraints: nozzle must stay within X[0..245] and Y[0..235].
-  //   MESH_MAX_X: probe_x + 45 <= 245  →  probe_x <= 200  (use 190 for 10mm margin)
-  //   MESH_MAX_Y: probe_y + 5  <= 235  →  probe_y <= 230  (use 220 for 10mm margin)
-  //   MESH_MIN_X: 10mm inset from bed left edge (nozzle at X=55, within limits)
-  //   MESH_MIN_Y: 10mm inset from bed front edge (nozzle at Y=15, within limits)
-  // Resulting pitch (3-point grid):
-  //   X: (190 - 10) / 2 = 90mm  → probe at X = 10, 100, 190
-  //   Y: (220 - 10) / 2 = 105mm → probe at Y = 10, 115, 220
-  #define MESH_MIN_X 10
-  #define MESH_MAX_X 190
-  #define MESH_MIN_Y 10
-  #define MESH_MAX_Y 220
+  // Mesh bounds in probe coordinates.
+  // When probing at P, nozzle moves to P - PROBE_OFFSET.
+  // MAX formula: nozzle must not exceed travel limit
+  //   probe_max = X_MAX_POS + PROBE_X_OFFSET - MESH_INSET
+  //             = 245 + (-45) - 10 = 190mm  (nozzle at 235mm)
+  // MIN formula: probe must stay inside bed + inset
+  //   (nozzle-min constraint is looser for negative offsets, so just MESH_INSET)
+  //   probe_min = MESH_INSET = 10mm  (nozzle at 55mm)
+  // Changing PROBE_X_OFFSET / PROBE_Y_OFFSET above will update these automatically.
+  #define MESH_INSET 10
+  #define MESH_MIN_X (MESH_INSET)
+  #define MESH_MAX_X ((X_MAX_POS) + (PROBE_X_OFFSET) - (MESH_INSET))
+  #define MESH_MIN_Y (MESH_INSET)
+  #define MESH_MAX_Y ((Y_MAX_POS) + (PROBE_Y_OFFSET) - (MESH_INSET))
   #define GRID_MAX_POINTS_X 3
   #define GRID_MAX_POINTS_Y GRID_MAX_POINTS_X
 
