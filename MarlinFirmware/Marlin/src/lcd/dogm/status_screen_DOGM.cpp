@@ -585,8 +585,8 @@ void MarlinUI::draw_status_screen() {
     }
     else {
       XY_CODE(
-        strcpy(xstring, is_inch ? ftostr53_63(LINEAR_UNIT(lpos.x)) : ftostr4sign(lpos.x)),
-        strcpy(ystring, is_inch ? ftostr53_63(LINEAR_UNIT(lpos.y)) : ftostr4sign(lpos.y))
+        strcpy(xstring, is_inch ? ftostr53_63(LINEAR_UNIT(lpos.x)) : ftostr42_52(lpos.x)),
+        strcpy(ystring, is_inch ? ftostr53_63(LINEAR_UNIT(lpos.y)) : ftostr42_52(lpos.y))
       );
     }
 
