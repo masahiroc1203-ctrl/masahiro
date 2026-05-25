@@ -28,13 +28,13 @@
 /**
  * Marlin release version identifier
  */
-#define SHORT_BUILD_VERSION "2.1.x-Ender3Pro-BLTouch-v2.4"
+#define SHORT_BUILD_VERSION "2.1.x-Ender3Pro-BLTouch-v2.5"
 
 /**
  * Verbose version identifier which should contain a reference to the location
  * from where the binary was downloaded or the source code was compiled.
  */
-#define DETAILED_BUILD_VERSION "Ender-3 Pro / Creality V4.2.7 / BLTouch / Encoder Tuning"
+#define DETAILED_BUILD_VERSION "Ender-3 Pro / Creality V4.2.7 / BLTouch / Build Fix"
 
 /**
  * The STRING_DISTRIBUTION_DATE represents when the binary file was built,
