@@ -112,7 +112,7 @@ float MarlinUI::ubl_mesh_value() { return rounded_mesh_value(); }
 void _lcd_ubl_build_custom_mesh() {
   char ubl_lcd_gcode[64];
   #if HAS_HEATED_BED
-    sprintf_P(ubl_lcd_gcode, PSTR("G28\nM190 S%i\nM109 S%i\nG29 P1"), custom_bed_temp, custom_hotend_temp);
+    sprintf_P(ubl_lcd_gcode, PSTR("G28\nG29 P1"));
   #else
     sprintf_P(ubl_lcd_gcode, PSTR("G28\nM109 S%i\nG29 P1"), custom_hotend_temp);
   #endif
@@ -314,6 +314,8 @@ void _lcd_ubl_invalidate() {
 void _lcd_ubl_build_mesh() {
   START_MENU();
   BACK_ITEM(MSG_UBL_TOOLS);
+  GCODES_ITEM(MSG_UBL_BUILD_COLD_MESH, F("G28\nG29 P1"));
+
   #if HAS_PREHEAT
     #define PREHEAT_BED_GCODE(M) TERN(HAS_HEATED_BED, "M190I" STRINGIFY(M) "\n", "")
     #define BUILD_MESH_GCODE_ITEM(M) GCODES_ITEM_f(ui.get_preheat_label(M), MSG_UBL_BUILD_MESH_M, \
