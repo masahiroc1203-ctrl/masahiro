@@ -37,5 +37,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: firmware-${{ github.sha }}
-          path: MarlinFirmware/.pio/build/STM32F103RE_creality/firmware.bin
+          path: MarlinFirmware/.pio/build/STM32F103RE_creality/firmware-*.bin
           retention-days: 30
