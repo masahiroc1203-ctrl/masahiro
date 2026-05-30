@@ -443,16 +443,16 @@ void menu_advanced_settings();
     BACK_ITEM(MSG_CONFIGURATION);
     #if HAS_FAN
       editable.uint8 = uint8_t(ui.material_preset[m].fan_speed);
-      EDIT_ITEM_N(percent, m, MSG_FAN_SPEED, &editable.uint8, 0, 255, []{ ui.material_preset[MenuItemBase::itemIndex].fan_speed = editable.uint8; });
+      EDIT_ITEM_N(percent, m, MSG_FAN_SPEED, &editable.uint8, 0, 255, []{ ui.material_preset[MenuItemBase::itemIndex].fan_speed = editable.uint8; ui.mark_settings_dirty(); });
     #endif
     #if HAS_TEMP_HOTEND
-      EDIT_ITEM(int3, MSG_NOZZLE, &ui.material_preset[m].hotend_temp, MINTARGET_ALL, MAXTARGET_ALL);
+      EDIT_ITEM(int3, MSG_NOZZLE, &ui.material_preset[m].hotend_temp, MINTARGET_ALL, MAXTARGET_ALL, []{ ui.mark_settings_dirty(); });
     #endif
     #if HAS_HEATED_BED
-      EDIT_ITEM(int3, MSG_BED, &ui.material_preset[m].bed_temp, BED_MINTEMP, BED_MAX_TARGET);
+      EDIT_ITEM(int3, MSG_BED, &ui.material_preset[m].bed_temp, BED_MINTEMP, BED_MAX_TARGET, []{ ui.mark_settings_dirty(); });
     #endif
     #if HAS_HEATED_CHAMBER
-      EDIT_ITEM(int3, MSG_CHAMBER, &ui.material_preset[m].chamber_temp, CHAMBER_MINTEMP, CHAMBER_MAX_TARGET);
+      EDIT_ITEM(int3, MSG_CHAMBER, &ui.material_preset[m].chamber_temp, CHAMBER_MINTEMP, CHAMBER_MAX_TARGET, []{ ui.mark_settings_dirty(); });
     #endif
     #if ENABLED(EEPROM_SETTINGS)
       ACTION_ITEM(MSG_STORE_EEPROM, ui.store_settings);
@@ -662,7 +662,7 @@ void menu_configuration() {
   #endif
 
   #if HAS_FILAMENT_SENSOR
-    EDIT_ITEM(bool, MSG_RUNOUT_SENSOR, &runout.enabled, runout.reset);
+    EDIT_ITEM(bool, MSG_RUNOUT_SENSOR, &runout.enabled, []{ runout.reset(); ui.mark_settings_dirty(); });
   #endif
 
   #if HAS_FANCHECK
@@ -670,7 +670,7 @@ void menu_configuration() {
   #endif
 
   #if ENABLED(POWER_LOSS_RECOVERY)
-    EDIT_ITEM(bool, MSG_OUTAGE_RECOVERY, &recovery.enabled, recovery.changed);
+    EDIT_ITEM(bool, MSG_OUTAGE_RECOVERY, &recovery.enabled, []{ recovery.changed(); ui.mark_settings_dirty(); });
     #if HAS_PLR_BED_THRESHOLD
       EDIT_ITEM(int3, MSG_RESUME_BED_TEMP, &recovery.bed_temp_threshold, 0, BED_MAX_TARGET);
     #endif
@@ -683,7 +683,7 @@ void menu_configuration() {
   #endif
 
   #if ENABLED(SOUND_MENU_ITEM)
-    EDIT_ITEM(bool, MSG_SOUND, &ui.sound_on, []{ ui.chirp(); });
+    EDIT_ITEM(bool, MSG_SOUND, &ui.sound_on, []{ ui.chirp(); ui.mark_settings_dirty(); });
   #endif
 
   // Debug Menu when certain options are enabled

@@ -794,6 +794,9 @@ public:
       static void init_eeprom();
       static void load_settings();
       static void store_settings();
+      static bool settings_dirty;
+      static void mark_settings_dirty() { settings_dirty = true; }
+      static void auto_save_if_dirty()  { if (settings_dirty) { settings_dirty = false; store_settings(); } }
     #endif
     static void eeprom_alert(const EEPROM_Error) TERN_(EEPROM_AUTO_INIT, {});
   #endif

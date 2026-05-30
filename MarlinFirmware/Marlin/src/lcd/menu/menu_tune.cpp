@@ -206,7 +206,7 @@ void menu_tune() {
   // Flow:
   //
   #if HAS_EXTRUDERS
-    EDIT_ITEM(int3, MSG_FLOW, &planner.flow_percentage[motion.extruder], FLOW_EDIT_MIN, FLOW_EDIT_MAX, []{ planner.refresh_e_factor(motion.extruder); });
+    EDIT_ITEM(int3, MSG_FLOW, &planner.flow_percentage[motion.extruder], FLOW_EDIT_MIN, FLOW_EDIT_MAX, []{ planner.refresh_e_factor(motion.extruder); ui.mark_settings_dirty(); });
     // Flow En:
     #if HAS_MULTI_EXTRUDER
       EXTRUDER_LOOP()

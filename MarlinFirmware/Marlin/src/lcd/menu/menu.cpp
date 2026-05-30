@@ -85,7 +85,10 @@ bool         MenuEditItemBase::liveEdit;
 //////// Menu Navigation & History /////////
 ////////////////////////////////////////////
 
-void MarlinUI::return_to_status() { goto_screen(status_screen); }
+void MarlinUI::return_to_status() {
+  TERN_(EEPROM_SETTINGS, auto_save_if_dirty());
+  goto_screen(status_screen);
+}
 
 void MarlinUI::push_current_screen() {
   if (screen_history_depth < COUNT(screen_history))
@@ -312,7 +315,7 @@ void scroll_screen(const uint8_t limit, const bool is_menu) {
   #include "../../feature/babystep.h"
 
   void lcd_babystep_zoffset() {
-    if (ui.use_click()) return ui.goto_previous_screen_no_defer();
+    if (ui.use_click()) { ui.mark_settings_dirty(); return ui.goto_previous_screen_no_defer(); }
     ui.defer_status_screen();
     const bool do_probe = DISABLED(BABYSTEP_HOTEND_Z_OFFSET) || motion.extruder == 0;
     if (ui.encoderPosition) {

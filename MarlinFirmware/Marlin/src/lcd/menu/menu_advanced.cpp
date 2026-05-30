@@ -350,9 +350,9 @@ void menu_backlash();
         raw_Kp = thermalManager.temp_hotend[N].pid.p(); \
         raw_Ki = thermalManager.temp_hotend[N].pid.i(); \
         raw_Kd = thermalManager.temp_hotend[N].pid.d(); \
-        EDIT_ITEM_FAST_N(float41sign, N, MSG_PID_P_E, &raw_Kp, 1.00f, 9990, []{ apply_PID_p(N); }); \
-        EDIT_ITEM_FAST_N(float52sign, N, MSG_PID_I_E, &raw_Ki, 0.01f, 9990, []{ apply_PID_i(N); }); \
-        EDIT_ITEM_FAST_N(float41sign, N, MSG_PID_D_E, &raw_Kd, 1.00f, 9990, []{ apply_PID_d(N); }); \
+        EDIT_ITEM_FAST_N(float41sign, N, MSG_PID_P_E, &raw_Kp, 1.00f, 9990, []{ apply_PID_p(N); ui.mark_settings_dirty(); }); \
+        EDIT_ITEM_FAST_N(float52sign, N, MSG_PID_I_E, &raw_Ki, 0.01f, 9990, []{ apply_PID_i(N); ui.mark_settings_dirty(); }); \
+        EDIT_ITEM_FAST_N(float41sign, N, MSG_PID_D_E, &raw_Kd, 1.00f, 9990, []{ apply_PID_d(N); ui.mark_settings_dirty(); }); \
       }while(0)
 
       #if ENABLED(PID_EXTRUSION_SCALING)
@@ -384,9 +384,9 @@ void menu_backlash();
         raw_Kp = T.pid.p(); \
         raw_Ki = T.pid.i(); \
         raw_Kd = T.pid.d(); \
-        EDIT_ITEM_FAST_N(float41sign, N, MSG_PID_P_E, &raw_Kp, 1.00f, 9990, []{ apply_PID_p(N); }); \
-        EDIT_ITEM_FAST_N(float52sign, N, MSG_PID_I_E, &raw_Ki, 0.01f, 9990, []{ apply_PID_i(N); }); \
-        EDIT_ITEM_FAST_N(float41sign, N, MSG_PID_D_E, &raw_Kd, 1.00f, 9990, []{ apply_PID_d(N); })
+        EDIT_ITEM_FAST_N(float41sign, N, MSG_PID_P_E, &raw_Kp, 1.00f, 9990, []{ apply_PID_p(N); ui.mark_settings_dirty(); }); \
+        EDIT_ITEM_FAST_N(float52sign, N, MSG_PID_I_E, &raw_Ki, 0.01f, 9990, []{ apply_PID_i(N); ui.mark_settings_dirty(); }); \
+        EDIT_ITEM_FAST_N(float41sign, N, MSG_PID_D_E, &raw_Kd, 1.00f, 9990, []{ apply_PID_d(N); ui.mark_settings_dirty(); })
     #endif
 
     #if ENABLED(PIDTEMP)
@@ -491,21 +491,21 @@ void menu_backlash();
     BACK_ITEM(MSG_ADVANCED_SETTINGS);
 
     LOOP_NUM_AXES(a)
-      EDIT_ITEM_FAST_N(float5, a, MSG_VMAX_N, &planner.settings.max_feedrate_mm_s[a], 1, max_fr_edit_scaled[a]);
+      EDIT_ITEM_FAST_N(float5, a, MSG_VMAX_N, &planner.settings.max_feedrate_mm_s[a], 1, max_fr_edit_scaled[a], []{ ui.mark_settings_dirty(); });
 
     #if E_STEPPERS
-      EDIT_ITEM_FAST_N(float5, E_AXIS, MSG_VMAX_N, &planner.settings.max_feedrate_mm_s[E_AXIS_N(motion.extruder)], 1, max_fr_edit_scaled.e);
+      EDIT_ITEM_FAST_N(float5, E_AXIS, MSG_VMAX_N, &planner.settings.max_feedrate_mm_s[E_AXIS_N(motion.extruder)], 1, max_fr_edit_scaled.e, []{ ui.mark_settings_dirty(); });
     #endif
     #if ENABLED(DISTINCT_E_FACTORS)
       for (uint8_t n = 0; n < E_STEPPERS; ++n)
-        EDIT_ITEM_FAST_N(float5, n, MSG_VMAX_EN, &planner.settings.max_feedrate_mm_s[E_AXIS_N(n)], 1, max_fr_edit_scaled.e);
+        EDIT_ITEM_FAST_N(float5, n, MSG_VMAX_EN, &planner.settings.max_feedrate_mm_s[E_AXIS_N(n)], 1, max_fr_edit_scaled.e, []{ ui.mark_settings_dirty(); });
     #endif
 
     // M205 S Min Feedrate
-    EDIT_ITEM_FAST(float5, MSG_VMIN, &planner.settings.min_feedrate_mm_s, 0, 9999);
+    EDIT_ITEM_FAST(float5, MSG_VMIN, &planner.settings.min_feedrate_mm_s, 0, 9999, []{ ui.mark_settings_dirty(); });
 
     // M205 T Min Travel Feedrate
-    EDIT_ITEM_FAST(float5, MSG_VTRAV_MIN, &planner.settings.min_travel_feedrate_mm_s, 0, 9999);
+    EDIT_ITEM_FAST(float5, MSG_VTRAV_MIN, &planner.settings.min_travel_feedrate_mm_s, 0, 9999, []{ ui.mark_settings_dirty(); });
 
     END_MENU();
   }
@@ -553,17 +553,17 @@ void menu_backlash();
     BACK_ITEM(MSG_ADVANCED_SETTINGS);
 
     // M204 P Acceleration
-    EDIT_ITEM_FAST(float5_25, MSG_ACC, &planner.settings.acceleration, 25, max_accel);
+    EDIT_ITEM_FAST(float5_25, MSG_ACC, &planner.settings.acceleration, 25, max_accel, []{ ui.mark_settings_dirty(); });
 
     #if HAS_EXTRUDERS
       // M204 R Retract Acceleration
-      EDIT_ITEM_FAST(float5, MSG_A_RETRACT, &planner.settings.retract_acceleration, 100, planner.settings.max_acceleration_mm_per_s2[E_AXIS_N(motion.extruder)]);
+      EDIT_ITEM_FAST(float5, MSG_A_RETRACT, &planner.settings.retract_acceleration, 100, planner.settings.max_acceleration_mm_per_s2[E_AXIS_N(motion.extruder)], []{ ui.mark_settings_dirty(); });
     #endif
 
     // M204 T Travel Acceleration
-    EDIT_ITEM_FAST(float5_25, MSG_A_TRAVEL, &planner.settings.travel_acceleration, 25, max_accel);
+    EDIT_ITEM_FAST(float5_25, MSG_A_TRAVEL, &planner.settings.travel_acceleration, 25, max_accel, []{ ui.mark_settings_dirty(); });
 
-    #define EDIT_AMAX(Q,L) EDIT_ITEM_FAST_N(long5_25, _AXIS(Q), MSG_AMAX_N, &planner.settings.max_acceleration_mm_per_s2[_AXIS(Q)], L, max_accel_edit_scaled[_AXIS(Q)], []{ planner.refresh_acceleration_rates(); })
+    #define EDIT_AMAX(Q,L) EDIT_ITEM_FAST_N(long5_25, _AXIS(Q), MSG_AMAX_N, &planner.settings.max_acceleration_mm_per_s2[_AXIS(Q)], L, max_accel_edit_scaled[_AXIS(Q)], []{ planner.refresh_acceleration_rates(); ui.mark_settings_dirty(); })
     NUM_AXIS_CODE(
       EDIT_AMAX(A, 100), EDIT_AMAX(B, 100), EDIT_AMAX(C, 10),
       EDIT_AMAX(I,  10), EDIT_AMAX(J,  10), EDIT_AMAX(K, 10),
@@ -571,14 +571,15 @@ void menu_backlash();
     );
 
     #if ENABLED(DISTINCT_E_FACTORS)
-      EDIT_ITEM_FAST(long5_25, MSG_AMAX_E, &planner.settings.max_acceleration_mm_per_s2[E_AXIS_N(motion.extruder)], 100, max_accel_edit_scaled.e, []{ planner.refresh_acceleration_rates(); });
+      EDIT_ITEM_FAST(long5_25, MSG_AMAX_E, &planner.settings.max_acceleration_mm_per_s2[E_AXIS_N(motion.extruder)], 100, max_accel_edit_scaled.e, []{ planner.refresh_acceleration_rates(); ui.mark_settings_dirty(); });
       for (uint8_t n = 0; n < E_STEPPERS; ++n)
         EDIT_ITEM_FAST_N(long5_25, n, MSG_AMAX_EN, &planner.settings.max_acceleration_mm_per_s2[E_AXIS_N(n)], 100, max_accel_edit_scaled.e, []{
           if (MenuItemBase::itemIndex == motion.extruder)
             planner.refresh_acceleration_rates();
+          ui.mark_settings_dirty();
        });
     #elif E_STEPPERS
-      EDIT_ITEM_FAST(long5_25, MSG_AMAX_E, &planner.settings.max_acceleration_mm_per_s2[E_AXIS], 100, max_accel_edit_scaled.e, []{ planner.refresh_acceleration_rates(); });
+      EDIT_ITEM_FAST(long5_25, MSG_AMAX_E, &planner.settings.max_acceleration_mm_per_s2[E_AXIS], 100, max_accel_edit_scaled.e, []{ planner.refresh_acceleration_rates(); ui.mark_settings_dirty(); });
     #endif
 
     #if HAS_SPINDLE_ACCELERATION
@@ -662,7 +663,7 @@ void menu_backlash();
     BACK_ITEM(MSG_ADVANCED_SETTINGS);
 
     LOOP_NUM_AXES(a)
-      EDIT_ITEM_FAST_N(float72, a, MSG_N_STEPS, &planner.settings.axis_steps_per_mm[a], 5, 9999, []{ planner.refresh_positioning(); });
+      EDIT_ITEM_FAST_N(float72, a, MSG_N_STEPS, &planner.settings.axis_steps_per_mm[a], 5, 9999, []{ planner.refresh_positioning(); ui.mark_settings_dirty(); });
 
     #if ENABLED(DISTINCT_E_FACTORS)
       for (uint8_t n = 0; n < E_STEPPERS; ++n)
@@ -672,9 +673,10 @@ void menu_backlash();
             planner.refresh_positioning();
           else
             planner.mm_per_step[E_AXIS_N(e)] = 1.0f / planner.settings.axis_steps_per_mm[E_AXIS_N(e)];
+          ui.mark_settings_dirty();
         });
     #elif E_STEPPERS
-      EDIT_ITEM_FAST_N(float72, E_AXIS, MSG_N_STEPS, &planner.settings.axis_steps_per_mm[E_AXIS], 5, 9999, []{ planner.refresh_positioning(); });
+      EDIT_ITEM_FAST_N(float72, E_AXIS, MSG_N_STEPS, &planner.settings.axis_steps_per_mm[E_AXIS], 5, 9999, []{ planner.refresh_positioning(); ui.mark_settings_dirty(); });
     #endif
 
     END_MENU();
@@ -728,8 +730,8 @@ void menu_advanced_settings() {
       // M205 - Max Jerk
       SUBMENU(MSG_JERK, menu_advanced_jerk);
     #elif HAS_JUNCTION_DEVIATION
-      EDIT_ITEM(float43, MSG_JUNCTION_DEVIATION, &planner.junction_deviation_mm, 0.001f, 0.3f
-        OPTARG(HAS_LINEAR_E_JERK, planner.recalculate_max_e_jerk)
+      EDIT_ITEM(float43, MSG_JUNCTION_DEVIATION, &planner.junction_deviation_mm, 0.001f, 0.3f,
+        []{ TERN_(HAS_LINEAR_E_JERK, planner.recalculate_max_e_jerk()); ui.mark_settings_dirty(); }
       );
     #endif
 

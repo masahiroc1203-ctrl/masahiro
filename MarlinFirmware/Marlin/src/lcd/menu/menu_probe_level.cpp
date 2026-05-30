@@ -269,7 +269,7 @@ void menu_probe_level() {
       // Homed and leveling is valid? Then leveling can be toggled.
       if (is_homed && is_valid) {
         bool show_state = planner.leveling_active;
-        EDIT_ITEM(bool, MSG_BED_LEVELING, &show_state, _lcd_toggle_bed_leveling);
+        EDIT_ITEM(bool, MSG_BED_LEVELING, &show_state, []{ _lcd_toggle_bed_leveling(); ui.mark_settings_dirty(); });
       }
 
       //
@@ -315,7 +315,7 @@ void menu_probe_level() {
   #if ENABLED(ENABLE_LEVELING_FADE_HEIGHT) && DISABLED(SLIM_LCD_MENUS)
     // Shadow for editing the fade height
     editable.decimal = planner.z_fade_height;
-    EDIT_ITEM_FAST(float3, MSG_Z_FADE_HEIGHT, &editable.decimal, 0, 100, []{ set_z_fade_height(editable.decimal); });
+    EDIT_ITEM_FAST(float3, MSG_Z_FADE_HEIGHT, &editable.decimal, 0, 100, []{ set_z_fade_height(editable.decimal); ui.mark_settings_dirty(); });
   #endif
 
   if (!g29_in_progress) {
@@ -336,8 +336,8 @@ void menu_probe_level() {
     // Probe XY Offsets
     //
     #if HAS_PROBE_XY_OFFSET
-      EDIT_ITEM_N(float31sign, X_AXIS, MSG_ZPROBE_OFFSET_N, &probe.offset.x, PROBE_OFFSET_XMIN, PROBE_OFFSET_XMAX);
-      EDIT_ITEM_N(float31sign, Y_AXIS, MSG_ZPROBE_OFFSET_N, &probe.offset.y, PROBE_OFFSET_YMIN, PROBE_OFFSET_YMAX);
+      EDIT_ITEM_N(float31sign, X_AXIS, MSG_ZPROBE_OFFSET_N, &probe.offset.x, PROBE_OFFSET_XMIN, PROBE_OFFSET_XMAX, []{ ui.mark_settings_dirty(); });
+      EDIT_ITEM_N(float31sign, Y_AXIS, MSG_ZPROBE_OFFSET_N, &probe.offset.y, PROBE_OFFSET_YMIN, PROBE_OFFSET_YMAX, []{ ui.mark_settings_dirty(); });
     #endif
 
     //
@@ -350,7 +350,7 @@ void menu_probe_level() {
     }
     else {
       #if HAS_BED_PROBE
-        EDIT_ITEM_N(LCD_Z_OFFSET_TYPE, Z_AXIS, MSG_ZPROBE_OFFSET_N, &probe.offset.z, PROBE_OFFSET_ZMIN, PROBE_OFFSET_ZMAX);
+        EDIT_ITEM_N(LCD_Z_OFFSET_TYPE, Z_AXIS, MSG_ZPROBE_OFFSET_N, &probe.offset.z, PROBE_OFFSET_ZMIN, PROBE_OFFSET_ZMAX, []{ ui.mark_settings_dirty(); });
       #endif
     }
 

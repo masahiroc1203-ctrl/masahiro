@@ -69,6 +69,10 @@ MarlinUI ui;
   bool MarlinUI::wait_for_move; // = false
 #endif
 
+#if ALL(EEPROM_SETTINGS, HAS_MARLINUI_MENU)
+  bool MarlinUI::settings_dirty = false;
+#endif
+
 #if ENABLED(MIGHTYBOARD_BACK_STATUS_BUTTONS)
   // Flags set from interrupt context; handled in main loop
   volatile uint8_t MarlinUI::request_back = 0;
