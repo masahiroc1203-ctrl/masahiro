@@ -95,7 +95,12 @@ def extract_flags(cmd_entry):
     if not parts:
         return None, [], "."
 
-    cc = parts[0].replace("gcc", "cpp")  # gcc → cpp に変換
+    # basename だけ arm-none-eabi-gcc → arm-none-eabi-cpp に変換（ディレクトリ名は変えない）
+    cc_path = parts[0]
+    cc_dir = os.path.dirname(cc_path)
+    cc_base = os.path.basename(cc_path)
+    cc_base_cpp = cc_base.replace("arm-none-eabi-gcc", "arm-none-eabi-cpp")
+    cc = os.path.join(cc_dir, cc_base_cpp) if cc_base_cpp != cc_base else cc_path
     src_dir = cmd_entry.get("directory", ".")
 
     flags = []
