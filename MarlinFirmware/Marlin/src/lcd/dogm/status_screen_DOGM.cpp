@@ -80,7 +80,7 @@
 #endif
 
 #define X_LABEL_POS      3
-#define X_VALUE_POS     11
+#define X_VALUE_POS      9
 #define XYZ_SPACING     37
 
 #define X_LABEL_POS_IN (X_LABEL_POS - 2)
@@ -585,8 +585,8 @@ void MarlinUI::draw_status_screen() {
     }
     else {
       XY_CODE(
-        strcpy(xstring, is_inch ? ftostr53_63(LINEAR_UNIT(lpos.x)) : ftostr42_52(lpos.x)),
-        strcpy(ystring, is_inch ? ftostr53_63(LINEAR_UNIT(lpos.y)) : ftostr42_52(lpos.y))
+        strcpy(xstring, is_inch ? ftostr53_63(LINEAR_UNIT(lpos.x)) : (lpos.x >= 100.0f ? ftostr41rj(lpos.x) : ftostr42_52(lpos.x))),
+        strcpy(ystring, is_inch ? ftostr53_63(LINEAR_UNIT(lpos.y)) : (lpos.y >= 100.0f ? ftostr41rj(lpos.y) : ftostr42_52(lpos.y)))
       );
     }
 
