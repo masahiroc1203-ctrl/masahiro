@@ -79,12 +79,12 @@
   #include "../../feature/mixing.h"
 #endif
 
-#define X_LABEL_POS      3
-#define X_VALUE_POS      9
-#define XYZ_SPACING     37
+#define X_LABEL_POS      1
+#define X_VALUE_POS      7
+#define XYZ_SPACING     42
 
-#define X_LABEL_POS_IN (X_LABEL_POS - 2)
-#define X_VALUE_POS_IN (X_VALUE_POS - 5)
+#define X_LABEL_POS_IN  0
+#define X_VALUE_POS_IN  7
 #define XYZ_SPACING_IN (XYZ_SPACING + 9)
 
 #define XYZ_BASELINE    (30 + INFO_FONT_ASCENT)
@@ -585,12 +585,12 @@ void MarlinUI::draw_status_screen() {
     }
     else {
       XY_CODE(
-        strcpy(xstring, is_inch ? ftostr53_63(LINEAR_UNIT(lpos.x)) : (lpos.x >= 100.0f ? ftostr41rj(lpos.x) : ftostr42_52(lpos.x))),
-        strcpy(ystring, is_inch ? ftostr53_63(LINEAR_UNIT(lpos.y)) : (lpos.y >= 100.0f ? ftostr41rj(lpos.y) : ftostr42_52(lpos.y)))
+        strcpy(xstring, is_inch ? ftostr53_63(LINEAR_UNIT(lpos.x)) : ftostr42_52(lpos.x)),
+        strcpy(ystring, is_inch ? ftostr53_63(LINEAR_UNIT(lpos.y)) : ftostr42_52(lpos.y))
       );
     }
 
-    TERN_(HAS_Z_AXIS, strcpy(zstring, is_inch ? ftostr42_52(LINEAR_UNIT(lpos.z)) : ftostr52sp(lpos.z)));
+    TERN_(HAS_Z_AXIS, strcpy(zstring, is_inch ? ftostr42_52(LINEAR_UNIT(lpos.z)) : ftostr42_52(lpos.z)));
 
     #if ENABLED(FILAMENT_LCD_DISPLAY)
       strcpy(wstring, ftostr12ns(filwidth.measured_mm));
