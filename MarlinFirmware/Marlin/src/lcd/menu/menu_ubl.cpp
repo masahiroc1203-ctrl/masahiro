@@ -316,22 +316,7 @@ void _lcd_ubl_build_mesh() {
   BACK_ITEM(MSG_UBL_TOOLS);
   GCODES_ITEM(MSG_UBL_BUILD_COLD_MESH, F("G28\nG29 P1"));
 
-  #if HAS_PREHEAT
-    #define PREHEAT_BED_GCODE(M) TERN(HAS_HEATED_BED, "M190I" STRINGIFY(M) "\n", "")
-    #define BUILD_MESH_GCODE_ITEM(M) GCODES_ITEM_f(ui.get_preheat_label(M), MSG_UBL_BUILD_MESH_M, \
-      F( \
-        "G28\n" \
-        PREHEAT_BED_GCODE(M) \
-        "M109I" STRINGIFY(M) "\n" \
-        "G29P1\n" \
-        "M104S0\n" \
-        "M140S0" \
-      ) );
-    REPEAT(PREHEAT_COUNT, BUILD_MESH_GCODE_ITEM)
-  #endif // HAS_PREHEAT
-
   SUBMENU(MSG_UBL_BUILD_CUSTOM_MESH, _lcd_ubl_custom_mesh);
-  GCODES_ITEM(MSG_UBL_BUILD_COLD_MESH, F("G29NP1"));
   SUBMENU(MSG_UBL_FILLIN_MESH, _menu_ubl_fillin);
   GCODES_ITEM(MSG_UBL_CONTINUE_MESH, F("G29P1C"));
   ACTION_ITEM(MSG_UBL_INVALIDATE_ALL, _lcd_ubl_invalidate);
