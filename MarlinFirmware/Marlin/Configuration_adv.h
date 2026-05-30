@@ -715,7 +715,7 @@
  * Multiple extruders can be assigned to the same pin in which case
  * the fan will turn on when any selected extruder is above the threshold.
  */
-#define E0_AUTO_FAN_PIN PC14  // Creality V4.2.7 hotend heatsink fan: on above EXTRUDER_AUTO_FAN_TEMPERATURE
+#define E0_AUTO_FAN_PIN -1    // V4.2.7: hotend fan is hardwired to 24V, not MCU-controlled
 #define E1_AUTO_FAN_PIN -1
 #define E2_AUTO_FAN_PIN -1
 #define E3_AUTO_FAN_PIN -1
