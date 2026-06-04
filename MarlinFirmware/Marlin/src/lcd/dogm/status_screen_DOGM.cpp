@@ -533,7 +533,7 @@ FORCE_INLINE void _draw_axis_value(const AxisEnum axis, const char *value, const
  */
 void MarlinUI::draw_status_screen() {
   #if NUM_AXES
-    constexpr int xystorage = TERN(INCH_MODE_SUPPORT, 8, 5);
+    constexpr int xystorage = TERN(INCH_MODE_SUPPORT, 8, 7);
     #if ANY(HAS_X_AXIS, LCD_SHOW_E_TOTAL)
       static char xstring[TERN(LCD_SHOW_E_TOTAL, 12, xystorage)];
     #endif
