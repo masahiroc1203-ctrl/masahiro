@@ -475,7 +475,7 @@ FORCE_INLINE void _draw_axis_value(const AxisEnum axis, const char *value, const
   else if (motion.axis_should_home(axis))
     while (const char c = *value++) lcd_put_lchar(c <= '.' ? c : '?');
   else if (NONE(HOME_AFTER_DEACTIVATE, DISABLE_REDUCED_ACCURACY_WARNING) && !motion.axis_is_trusted(axis))
-    lcd_put_u8str(TERN0(HAS_Z_AXIS, axis == Z_AXIS) ? F("       ") : F("    "));
+    lcd_put_u8str(TERN0(HAS_Z_AXIS, axis == Z_AXIS) ? F("     ") : F("    "));
   else
     lcd_put_u8str(value);
 }
@@ -585,12 +585,12 @@ void MarlinUI::draw_status_screen() {
     }
     else {
       XY_CODE(
-        strcpy(xstring, is_inch ? ftostr53_63(LINEAR_UNIT(lpos.x)) : ftostr42_52(lpos.x)),
-        strcpy(ystring, is_inch ? ftostr53_63(LINEAR_UNIT(lpos.y)) : ftostr42_52(lpos.y))
+        strcpy(xstring, is_inch ? ftostr53_63(LINEAR_UNIT(lpos.x)) : (lpos.x >= 100.0f ? ftostr41rj(lpos.x) : ftostr42_52(lpos.x))),
+        strcpy(ystring, is_inch ? ftostr53_63(LINEAR_UNIT(lpos.y)) : (lpos.y >= 100.0f ? ftostr41rj(lpos.y) : ftostr42_52(lpos.y)))
       );
     }
 
-    TERN_(HAS_Z_AXIS, strcpy(zstring, is_inch ? ftostr42_52(LINEAR_UNIT(lpos.z)) : ftostr42_52(lpos.z)));
+    TERN_(HAS_Z_AXIS, strcpy(zstring, is_inch ? ftostr42_52(LINEAR_UNIT(lpos.z)) : (lpos.z >= 100.0f ? ftostr41rj(lpos.z) : ftostr42_52(lpos.z))));
 
     #if ENABLED(FILAMENT_LCD_DISPLAY)
       strcpy(wstring, ftostr12ns(filwidth.measured_mm));
