@@ -35,6 +35,8 @@
 #include "../lcdprint.h"
 #include "../../libs/numtostr.h"
 
+extern const u8g_fntpgm_uint8_t u8g_font_5x8[];
+
 #include "../../module/motion.h"
 #include "../../module/temperature.h"
 
@@ -470,6 +472,8 @@ FORCE_INLINE void _draw_axis_value(const AxisEnum axis, const char *value, const
   lcd_put_lchar((is_inch ? X_LABEL_POS_IN : X_LABEL_POS) + offs, XYZ_BASELINE, AXIS_CHAR(axis));
   lcd_moveto((is_inch ? X_VALUE_POS_IN : X_VALUE_POS) + offs, XYZ_BASELINE);
 
+  u8g.setFont(u8g_font_5x8);
+
   if (blink)
     lcd_put_u8str(value);
   else if (motion.axis_should_home(axis))
@@ -478,6 +482,8 @@ FORCE_INLINE void _draw_axis_value(const AxisEnum axis, const char *value, const
     lcd_put_u8str(TERN0(HAS_Z_AXIS, axis == Z_AXIS) ? F("     ") : F("    "));
   else
     lcd_put_u8str(value);
+
+  u8g.setFont(MENU_FONT_NAME);
 }
 
 // Prepare strings for progress display
@@ -585,12 +591,12 @@ void MarlinUI::draw_status_screen() {
     }
     else {
       XY_CODE(
-        strcpy(xstring, is_inch ? ftostr53_63(LINEAR_UNIT(lpos.x)) : (lpos.x >= 100.0f ? ftostr41rj(lpos.x) : ftostr42_52(lpos.x))),
-        strcpy(ystring, is_inch ? ftostr53_63(LINEAR_UNIT(lpos.y)) : (lpos.y >= 100.0f ? ftostr41rj(lpos.y) : ftostr42_52(lpos.y)))
+        strcpy(xstring, is_inch ? ftostr53_63(LINEAR_UNIT(lpos.x)) : ftostr42_52(lpos.x)),
+        strcpy(ystring, is_inch ? ftostr53_63(LINEAR_UNIT(lpos.y)) : ftostr42_52(lpos.y))
       );
     }
 
-    TERN_(HAS_Z_AXIS, strcpy(zstring, is_inch ? ftostr42_52(LINEAR_UNIT(lpos.z)) : (lpos.z >= 100.0f ? ftostr41rj(lpos.z) : ftostr42_52(lpos.z))));
+    TERN_(HAS_Z_AXIS, strcpy(zstring, is_inch ? ftostr42_52(LINEAR_UNIT(lpos.z)) : ftostr42_52(lpos.z)));
 
     #if ENABLED(FILAMENT_LCD_DISPLAY)
       strcpy(wstring, ftostr12ns(filwidth.measured_mm));
