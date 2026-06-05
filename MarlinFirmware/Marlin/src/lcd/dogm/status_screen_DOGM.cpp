@@ -483,7 +483,9 @@ FORCE_INLINE void _draw_axis_value(const AxisEnum axis, const char *value, const
   else
     lcd_put_u8str(value);
 
-  u8g.setFont(MENU_FONT_NAME);
+  // Restore status menu font; force cache invalidation since u8g was switched directly
+  MarlinUI::set_font(FONT_MENU);
+  MarlinUI::set_font(FONT_STATUSMENU);
 }
 
 // Prepare strings for progress display
