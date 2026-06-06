@@ -42,8 +42,7 @@
 static int16_t ubl_storage_slot = 0,
                custom_hotend_temp = 150,
                side_points = 3,
-               ubl_fillin_amount = 5,
-               ubl_height_amount = 1;
+               ubl_fillin_amount = 5;
 
 static uint8_t n_edit_pts = 1;
 static int8_t x_plot = 0, y_plot = 0; // May be negative during move
@@ -141,39 +140,11 @@ void _lcd_ubl_custom_mesh() {
 }
 
 /**
- * UBL Adjust Mesh Height Command
- */
-void _lcd_ubl_adjust_height_cmd() {
-  char ubl_lcd_gcode[14];
-  const int ind = ubl_height_amount > 0 ? 6 : 7;
-  strcpy_P(ubl_lcd_gcode, PSTR("G29P6C-"));
-  sprintf_P(&ubl_lcd_gcode[ind], PSTR(".%i"), ABS(ubl_height_amount));
-  queue.inject(ubl_lcd_gcode);
-}
-
-/**
- * UBL Adjust Mesh Height submenu
- *
- * << Edit Mesh
- *    Height Amount: ---
- *    Adjust Mesh Height
- * << Info Screen
- */
-void _menu_ubl_height_adjust() {
-  START_MENU();
-  BACK_ITEM(MSG_EDIT_MESH);
-  EDIT_ITEM(int3, MSG_UBL_MESH_HEIGHT_AMOUNT, &ubl_height_amount, -9, 9, _lcd_ubl_adjust_height_cmd);
-  ACTION_ITEM(MSG_INFO_SCREEN, ui.return_to_status);
-  END_MENU();
-}
-
-/**
  * UBL Edit Mesh submenu
  *
  * << UBL Tools
  *    Fine Tune All
  *    Fine Tune Closest
- *  - Adjust Mesh Height >>
  * << Info Screen
  */
 void _lcd_ubl_edit_mesh() {
@@ -181,7 +152,6 @@ void _lcd_ubl_edit_mesh() {
   BACK_ITEM(MSG_UBL_TOOLS);
   GCODES_ITEM(MSG_UBL_FINE_TUNE_ALL, F("G29P4RT"));
   GCODES_ITEM(MSG_UBL_FINE_TUNE_CLOSEST, F("G29P4T"));
-  SUBMENU(MSG_UBL_MESH_HEIGHT_ADJUST, _menu_ubl_height_adjust);
   ACTION_ITEM(MSG_INFO_SCREEN, ui.return_to_status);
   END_MENU();
 }
@@ -615,46 +585,5 @@ void _menu_ubl_tools() {
 
 #endif
 
-/**
- * UBL System submenu
- *
- * << Motion
- *  - Activate / Deactivate UBL
- *  - Edit Fade Height
- *  - Step-By-Step UBL >>
- *  - Mesh Wizard >>
- *  - Mesh Edit >>
- *  - Mesh Storage >>
- *  - Output Map >>
- *  - UBL Tools >>
- *  - Output UBL Info >>
- */
-void _lcd_ubl_level_bed() {
-  START_MENU();
-  BACK_ITEM(MSG_MOTION);
-
-  bool show_state = planner.leveling_active;
-  EDIT_ITEM(bool, MSG_BED_LEVELING, &show_state, _lcd_toggle_bed_leveling);
-
-  #if ENABLED(ENABLE_LEVELING_FADE_HEIGHT)
-    editable.decimal = planner.z_fade_height;
-    EDIT_ITEM_FAST(float3, MSG_Z_FADE_HEIGHT, &editable.decimal, 0, 100, []{ set_z_fade_height(editable.decimal); });
-  #endif
-
-  #if ENABLED(G26_MESH_VALIDATION)
-    SUBMENU(MSG_UBL_STEP_BY_STEP_MENU, _lcd_ubl_step_by_step);
-  #endif
-
-  #if ENABLED(UBL_MESH_WIZARD)
-    SUBMENU(MSG_UBL_MESH_WIZARD, _menu_ubl_mesh_wizard);
-  #endif
-
-  ACTION_ITEM(MSG_MESH_EDITOR, _ubl_goto_map_screen);
-  SUBMENU(MSG_UBL_STORAGE_MESH_MENU, _lcd_ubl_storage_mesh);
-  SUBMENU(MSG_UBL_OUTPUT_MAP, _lcd_ubl_output_map);
-  SUBMENU(MSG_UBL_TOOLS, _menu_ubl_tools);
-  GCODES_ITEM(MSG_UBL_INFO_UBL, F("G29W"));
-  END_MENU();
-}
 
 #endif // HAS_MARLINUI_MENU && AUTO_BED_LEVELING_UBL

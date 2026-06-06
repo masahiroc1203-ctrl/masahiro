@@ -229,7 +229,16 @@
 #endif // MESH_EDIT_MENU
 
 #if ENABLED(AUTO_BED_LEVELING_UBL)
-  void _lcd_ubl_level_bed();
+  #if ENABLED(G26_MESH_VALIDATION)
+    void _lcd_ubl_step_by_step();
+  #endif
+  #if ENABLED(UBL_MESH_WIZARD)
+    void _menu_ubl_mesh_wizard();
+  #endif
+  void _ubl_goto_map_screen();
+  void _lcd_ubl_storage_mesh();
+  void _lcd_ubl_output_map();
+  void _menu_ubl_tools();
 #endif
 
 #if ENABLED(ASSISTED_TRAMMING_WIZARD)
@@ -276,8 +285,18 @@ void menu_probe_level() {
       // Level Bed
       //
       #if ENABLED(AUTO_BED_LEVELING_UBL)
-        // UBL uses a guided procedure
-        SUBMENU(MSG_UBL_LEVELING, _lcd_ubl_level_bed);
+        // UBL items inlined (no intermediate submenu)
+        #if ENABLED(G26_MESH_VALIDATION)
+          SUBMENU(MSG_UBL_STEP_BY_STEP_MENU, _lcd_ubl_step_by_step);
+        #endif
+        #if ENABLED(UBL_MESH_WIZARD)
+          SUBMENU(MSG_UBL_MESH_WIZARD, _menu_ubl_mesh_wizard);
+        #endif
+        ACTION_ITEM(MSG_MESH_EDITOR, _ubl_goto_map_screen);
+        SUBMENU(MSG_UBL_STORAGE_MESH_MENU, _lcd_ubl_storage_mesh);
+        SUBMENU(MSG_UBL_OUTPUT_MAP, _lcd_ubl_output_map);
+        SUBMENU(MSG_UBL_TOOLS, _menu_ubl_tools);
+        GCODES_ITEM(MSG_UBL_INFO_UBL, F("G29W"));
       #elif ANY(PROBE_MANUALLY, MESH_BED_LEVELING)
         #if ENABLED(LCD_BED_LEVELING)
           // Manual leveling uses a guided procedure
