@@ -29,8 +29,9 @@ Motion
 │   ├── Move Y              →  10mm / 1mm / 0.1mm
 │   ├── Move Z              →  10mm / 1mm / 0.1mm
 │   └── Move E              →  10mm / 1mm / 0.1mm
+│   ※ 未ホーミング時は Move X/Y/Z の代わりに Auto Home が表示
 ├── Auto Home                  G28
-└── Soft Endstops           [on/off]
+└── Disable Steppers           M84
 ```
 
 ---
@@ -39,46 +40,70 @@ Motion
 
 ```
 Probe and Level
-├── Auto Home                  G28（未ホーミング時のみ表示）
-├── Bed Leveling            [on/off]
+├── Auto Home                  G28（未ホーミング時のみ）
+├── Bed Leveling            [on/off]（ホーミング済かつメッシュ有効時のみ）
 ├── UBL Leveling            →  ※下記サブメニュー参照
-├── Level Bed                  G29（ホーミング済の場合）
-├── Edit Mesh               →  メッシュ編集
+├── Edit Mesh               →  X/Y/Zポイント手動編集（基本エディタ）
 ├── Z Fade Height              高さ補正フェード(mm)
 ├── Manual Deploy              M401
 ├── Manual Stow                M402
 ├── Zprobe Offset X            プローブXオフセット
 ├── Zprobe Offset Y            プローブYオフセット
-├── Babystep Z / Z Probe Wizard →
-├── Zprobe Offset Z            プローブZオフセット
+├── Babystep Z              →  Zオフセット＋ベイビーステップ調整
 ├── Z Probe Wizard          →  Zオフセットウィザード
 ├── M48 Probe Test             G28O + M48 P10
 └── Store Settings             M500
 ```
 
-### UBL Leveling サブメニュー
+---
+
+## UBL Leveling サブメニュー
 
 ```
 UBL Leveling
-├── Activate UBL
-├── Deactivate UBL
+├── Bed Leveling            [on/off]
+├── Z Fade Height
 ├── Step-By-Step UBL        →
-├── Edit Mesh               →
-│   └── Fine Tune Mesh      →
-│       ├── Fine Tune All      G29P4RT
-│       └── Fine Tune Closest  G29P4T
-├── Mesh Height Adjust
-├── Validate Mesh           →
-│   ├── Validate PLA           G28 + G26CPI0
-│   └── Validate ABS           G28 + G26CPI1
-├── Grid Level              →
-│   ├── 3-Point Leveling       G29J0
-│   └── Grid Mesh Leveling
-├── Mesh Storage            →
+│   ├── 1 Build Cold Mesh      G29NP1
+│   ├── 2 Smart Fill-in        G29P3T0
+│   ├── 3 Validate Mesh        →（G26検証）
+│   ├── 4 Fine Tune All        G29P4RT
+│   ├── 5 Validate Mesh        →（G26検証）
+│   ├── 6 Fine Tune All        G29P4RT
+│   └── 7 Save Bed Mesh
+├── Mesh Wizard             →
+│   ├── Hotend Temp
+│   ├── Bed Temp
 │   ├── Storage Slot
-│   ├── Load Mesh
-│   └── Save Mesh
-└── Return to Status
+│   ├── Mesh Wizard（実行）
+│   └── Validate Mesh       →
+├── Mesh Editor                マップ画面（グリッド表示・直接編集）
+├── Mesh Storage            →
+│   ├── Storage Slot: [0-n]
+│   ├── Load Bed Mesh
+│   └── Save Bed Mesh
+├── Output Map              →
+│   ├── Output for Host        G29T0
+│   ├── Output for CSV         G29T1
+│   └── Off Printer Backup     G29S-1
+├── UBL Tools               →
+│   ├── Build Mesh          →
+│   │   ├── Build Cold Mesh    G28 + G29P1
+│   │   ├── Build Custom Mesh  →（温度指定ビルド）
+│   │   ├── Fill-in Mesh       →
+│   │   ├── Continue Mesh      G29P1C
+│   │   ├── Invalidate All
+│   │   └── Invalidate Closest G29I
+│   ├── Manual Mesh            G29I999 + G29P2BT0
+│   ├── Validate Mesh       →（G26）
+│   ├── Edit Mesh           →
+│   │   ├── Fine Tune All      G29P4RT
+│   │   ├── Fine Tune Closest  G29P4T
+│   │   └── Mesh Height Adjust
+│   └── Mesh Leveling       →
+│       ├── 3-Point Leveling   G29J0
+│       └── Grid Mesh Leveling →
+└── Output UBL Info            G29W
 ```
 
 ---
@@ -91,10 +116,10 @@ Temperature
 ├── Bed:                    xxx °C（0〜100）
 ├── Fan Speed:              xxx（0〜255）
 ├── Preheat PLA             →
-│   ├── Preheat PLA            ノズル+ベッド同時予熱
-│   ├── Preheat PLA End        ノズルのみ予熱
+│   ├── Preheat PLA            ノズル＋ベッド同時予熱
+│   ├── Preheat PLA End        ノズルのみ
 │   ├── Preheat PLA All
-│   └── Preheat PLA Bed        ベッドのみ予熱
+│   └── Preheat PLA Bed        ベッドのみ
 ├── Preheat ABS             →
 │   ├── Preheat ABS
 │   ├── Preheat ABS End
@@ -110,6 +135,8 @@ Temperature
 ```
 Configuration
 ├── Advanced Settings       →  ※下記サブメニュー参照
+├── BLTouch                 →  ※下記サブメニュー参照
+├── Runout Sensor           [on/off]
 ├── Preheat PLA Conf        →
 │   ├── Nozzle Temp
 │   ├── Bed Temp
@@ -118,10 +145,9 @@ Configuration
 │   ├── Nozzle Temp
 │   ├── Bed Temp
 │   └── Store Settings
-├── BLTouch                 →  ※下記サブメニュー参照
 ├── Store Settings             M500（EEPROM保存）
 ├── Load Settings              M501（EEPROM読込）
-└── Reset Settings             M502（初期化）
+└── Reset Settings             M502（工場出荷時設定に戻す）
 ```
 
 ### Advanced Settings サブメニュー
@@ -130,37 +156,26 @@ Configuration
 Advanced Settings
 ├── Temperature             →
 │   ├── PID Autotune E1
-│   ├── Hotend PID P
-│   ├── Hotend PID I
-│   ├── Hotend PID D
+│   ├── Hotend PID P / I / D
 │   ├── PID Autotune Bed
-│   ├── Bed PID P
-│   ├── Bed PID I
-│   └── Bed PID D
+│   └── Bed PID P / I / D
 ├── Velocity Max            →
-│   ├── Vmax X
-│   ├── Vmax Y
-│   ├── Vmax Z
-│   ├── Vmax E
+│   ├── Vmax X / Y / Z / E
 │   ├── Vmin
 │   └── Vtrav Min
 ├── Max Acceleration        →
-│   ├── Amax X
-│   ├── Amax Y
-│   ├── Amax Z
-│   └── Amax E
+│   └── Amax X / Y / Z / E
 ├── Acceleration            →
-│   ├── Accel
+│   ├── Accel（印刷）
 │   ├── A-Retract
 │   └── A-Travel
 ├── Junction Deviation
 ├── Steps/mm                →
-│   ├── X Steps/mm
-│   ├── Y Steps/mm
-│   ├── Z Steps/mm
-│   └── E Steps/mm
+│   └── X / Y / Z / E Steps/mm
 └── Filament                →
-    └── Fil. Runout Distance
+    ├── Fil. Unload
+    ├── Fil. Load
+    └── Runout Distance
 ```
 
 ### BLTouch サブメニュー
@@ -173,8 +188,8 @@ BLTouch
 ├── Stow
 ├── SW Mode
 ├── Speed Mode          [on/off]
-├── 5V Mode             ※要確認
-├── OD Mode             ※要確認
+├── 5V Mode
+├── OD Mode
 ├── Mode Store
 ├── Mode Store 5V
 ├── Mode Store OD
@@ -197,7 +212,7 @@ About Printer
 ## 印刷中メニュー（Tune）
 
 ```
-Tune（Main Menu → 印刷中）
+Main Menu（印刷中）
 ├── Pause Print
 ├── Stop Print
 ├── Tune                    →
@@ -225,4 +240,3 @@ Tune（Main Menu → 印刷中）
 | プローブ | BLTouch |
 | プローブ温度待ち | 無効（PREHEAT_BEFORE_PROBING OFF）|
 | レベリング温度待ち | 無効（PREHEAT_BEFORE_LEVELING OFF）|
-
