@@ -11,12 +11,14 @@
 Main Menu
 ├── [SDカード → ファイル一覧]
 ├── Motion                  →
-├── Probe and Level         →
+├── Bed Leveling            →
 ├── Change Filament
 ├── Temperature             →
 ├── Configuration           →
 └── About Printer           →
 ```
+
+> LCD実機の表示は **"Probe and Level"**
 
 ---
 
@@ -38,16 +40,21 @@ Motion
 
 ---
 
-## Probe and Level（プローブ＆レベリング）
+## Bed Leveling（ベッドレベリング）
+
+> LCD実機の表示は **"Probe and Level"** と **"UBL Leveling"** の2階層  
+> ここでは機能別にまとめて表示
 
 ```
-Probe and Level
+Bed Leveling
 ← Main Menu
 ├── Auto Home                  G28（未ホーミング時のみ）
 │
-├── UBL                     →  ※下記参照
+├─ [補正の適用]──────────────────────────────────────────
+├── Bed Leveling            [on/off]  メッシュ補正を印刷に適用するかどうか
+├── Z Fade Height              補正フェード高さ（mm）
 │
-├─ [プローブ設定]
+├─ [プローブ設定]────────────────────────────────────────
 ├── Zprobe Offset X            BLTouchのノズルからのX物理距離
 ├── Zprobe Offset Y            BLTouchのノズルからのY物理距離
 ├── Babystep Z              →  Zオフセット微調整（印刷中も反映）
@@ -56,34 +63,9 @@ Probe and Level
 ├── Manual Deploy              M401（BLTouch手動展開）
 ├── Manual Stow                M402（BLTouch手動格納）
 │
-├─ [メッシュ点直接編集]
-├── Mesh Point Edit            X/Y座標を選んでZ値を数値入力する基本エディタ
-│   ← Probe and Level         ※ LCD表示は "Edit Mesh"
-│   ├── Mesh X: [0-n]
-│   ├── Mesh Y: [0-n]
-│   └── Z Pos: x.xxx mm
-│
-├── Z Fade Height              高さ補正フェード(mm)（UBL ON時に有効）
-└── Store Settings             M500（EEPROMへ保存）
-```
-
----
-
-## UBL（Unified Bed Leveling）
-
-> LCD実機の表示は **"UBL Leveling"**
-
-```
-UBL
-← Probe and Level
-│
-├─ [補正の適用]
-├── Bed Leveling            [on/off]  メッシュ補正を印刷に適用するかどうか
-├── Z Fade Height              補正フェード高さ（mm）
-│
-├─ [メッシュ作成]
+├─ [メッシュ作成]────────────────────────────────────────
 ├── Step-By-Step            →  初回メッシュ作成の手順ガイド（推奨）
-│   ← UBL
+│   ← Bed Leveling
 │   ├── 1 Build Cold Mesh      G29NP1　　プローブで全面自動測定
 │   ├── 2 Smart Fill-in        G29P3T0　 未測定点を補間
 │   ├── 3 Validate Mesh     →  G26テスト印刷→目視確認
@@ -92,39 +74,42 @@ UBL
 │   ├── 6 Fine Tune All        G29P4RT　 最終調整
 │   └── 7 Save Bed Mesh        EEPROMスロットへ保存
 ├── Mesh Wizard             →  温度・スロット指定してワンクリック作成
-│   ← UBL
+│   ← Bed Leveling
 │   ├── Hotend Temp / Bed Temp / Storage Slot
 │   └── Mesh Wizard（実行）
 ├── Build Cold Mesh            G28 + G29P1　プローブで全面自動測定
 ├── Build Custom Mesh          温度指定してビルド
 ├── Continue Mesh              G29P1C　中断したメッシュを継続
-├── Manual Mesh                G29I999 + G29P2BT0　プローブ無しで手動測定
+├── Manual Mesh                手動プローブ（BLTouch不使用）
 ├── Invalidate All             全測定値をクリア
 ├── Invalidate Closest         G29I　最近点のみクリア
 │
-├─ [メッシュ調整・確認]
+├─ [メッシュ調整・確認]──────────────────────────────────
+├── Mesh Point Edit            X/Y座標を選んでZ値を数値入力
+│   ← Bed Leveling            ※ LCD表示は "Edit Mesh"
+│   ├── Mesh X: [0-n]
+│   ├── Mesh Y: [0-n]
+│   └── Z Pos: x.xxx mm
 ├── Mesh Editor                グリッドマップ表示・ノブで各点を直接操作
 ├── Fine Tune All              G29P4RT　全点をプローブで再測定・調整
-├── Fine Tune Closest          G29P4T　最近点のみ
-├── Mesh Height Adjust         全点を一括シフト（整数値 -9〜+9）
-│                              ※ ビルドプレート交換など全体的なZ変化に使用
+├── Fine Tune Closest          G29P4T　　最近点のみ
 ├── Validate Mesh           →  G26テスト印刷で目視確認
-│   ← UBL
+│   ← Bed Leveling
 │   ├── Validate PLA           G28 + G26（PLA設定で印刷）
 │   └── Validate ABS
-├── 3-Point Leveling           G29J0
-├── Grid Mesh Leveling      →
 │
-├─ [保存・読込]
+├─ [保存・読込]──────────────────────────────────────────
 ├── Storage Slot: [0-n]
 ├── Save Bed Mesh
 ├── Load Bed Mesh
 │
-└─ [出力・情報]
-   ├── Output for Host         G29T0（ホストへ送信）
-   ├── Output for CSV          G29T1
-   ├── Off Printer Backup      G29S-1
-   └── Output UBL Info         G29W（UBL状態をホストへ出力）
+├─ [出力・情報]──────────────────────────────────────────
+├── Output for Host            G29T0（シリアルへ送信）
+├── Output for CSV             G29T1
+├── Off Printer Backup         G29S-1
+├── Output UBL Info            G29W（UBL状態をシリアルへ出力）
+│
+└── Store Settings             M500（EEPROMへ保存）
 ```
 
 ---
@@ -145,7 +130,7 @@ Temperature
 │   └── Preheat PLA Bed        ベッドのみ
 ├── Preheat ABS             →
 │   ← Temperature
-│   ├── Preheat ABS / End / All / Bed
+│   └── Preheat ABS / End / All / Bed
 └── Cooldown                   全ヒーターOFF
 ```
 
@@ -169,7 +154,7 @@ Configuration
 │   ← Configuration
 │   ├── Reset / Self Test / Deploy / Stow
 │   ├── SW Mode / Speed Mode [on/off]
-│   ├── 5V Mode / OD Mode / Mode Store / Mode Echo
+│   └── 5V Mode / OD Mode / Mode Store / Mode Echo
 ├── Runout Sensor           [on/off]
 ├── Preheat PLA Conf        →  ノズル温度・ベッド温度・Store Settings
 ├── Preheat ABS Conf        →  ノズル温度・ベッド温度・Store Settings
@@ -214,17 +199,16 @@ Main Menu（印刷中）
 
 ## 機能早見表
 
-| 機能 | 場所 | 役割 |
-|------|------|------|
-| Bed Leveling [on/off] | UBL | メッシュ補正を印刷に適用するか |
-| Probe X/Y Offset | Probe and Level | BLTouchの物理取付オフセット |
-| Babystep Z | Probe and Level | Zオフセット微調整（印刷中も反映） |
-| Mesh Point Edit | Probe and Level | X/Y座標→Z値を数値で直接入力 |
-| Mesh Editor | UBL | グリッドマップでノブ直接操作 |
-| Fine Tune | UBL | プローブで実測して自動調整 |
-| Mesh Height Adjust | UBL | 全点を整数値で一括シフト |
-| Validate Mesh | UBL | G26テスト印刷→目視確認 |
-| Step-By-Step | UBL | 上記を順番にガイド（初回向け）|
+| 機能 | 役割 |
+|------|------|
+| Bed Leveling [on/off] | メッシュ補正を印刷に適用するか |
+| Probe X/Y Offset | BLTouchの物理取付オフセット |
+| Babystep Z | Zオフセット微調整（印刷中も反映） |
+| Mesh Point Edit | X/Y座標→Z値を数値で直接入力 |
+| Mesh Editor | グリッドマップでノブ直接操作 |
+| Fine Tune | プローブで実測して自動調整 |
+| Validate Mesh | G26テスト印刷→目視確認 |
+| Step-By-Step | 上記を順番にガイド（初回向け）|
 
 ---
 
