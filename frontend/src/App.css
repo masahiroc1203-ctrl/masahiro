@@ -509,3 +509,99 @@ body {
   color: #d32f2f;
   font-size: 0.75rem;
 }
+
+/* Extract button */
+.btn-extract {
+  background-color: #f57c00;
+  color: #fff;
+  border: none;
+}
+
+.btn-extract:hover:not(:disabled) {
+  background-color: #e65100;
+}
+
+/* Extraction results in RenamePanel */
+.extract-results {
+  background: #f9f9f9;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 12px 16px;
+}
+
+.extract-result-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.extract-found,
+.extract-not-found {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 0.875rem;
+}
+
+.extract-keyword {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.extract-context {
+  color: #555;
+  font-size: 0.82rem;
+  word-break: break-all;
+}
+
+.extract-not-found .extract-context {
+  color: #c62828;
+}
+
+.confirm-check-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #333;
+  cursor: pointer;
+  padding-top: 8px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.confirm-check-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+/* Batch rename extract columns */
+.batch-extract-col {
+  min-width: 120px;
+  font-size: 0.8rem;
+}
+
+.batch-extract-results {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.batch-confirm-col {
+  text-align: center;
+  width: 48px;
+}
+
+.batch-confirm-col input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.extract-pending {
+  color: #aaa;
+  font-size: 0.8rem;
+}
