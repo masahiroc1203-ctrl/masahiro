@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
 import config
+from services.pdf_extractor import extract_hinmei
 
 UPLOADS_DIR = config.UPLOADS_DIR
 
@@ -51,6 +52,44 @@ async def upload_file(file: UploadFile):
     dest.write_bytes(content)
 
     return {"filename": final_name, "size": len(content)}
+
+
+@router.post("/upload-auto-rename")
+async def upload_and_auto_rename(file: UploadFile):
+    """アップロード後に品名を自動抽出してリネームする"""
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No filename provided")
+
+    filename = safe_filename(file.filename)
+    if not filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF files are allowed")
+
+    UPLOADS_DIR.mkdir(exist_ok=True)
+    saved_name = unique_filename(UPLOADS_DIR, filename)
+    dest = UPLOADS_DIR / saved_name
+    content = await file.read()
+    dest.write_bytes(content)
+
+    # 品名抽出
+    try:
+        hinmei = extract_hinmei(str(dest))
+    except Exception:
+        hinmei = None
+
+    # 品名が取れた場合のみリネーム
+    final_name = saved_name
+    if hinmei:
+        stem = Path(saved_name).stem
+        new_name = unique_filename(UPLOADS_DIR, f"{stem}_{hinmei}.pdf")
+        dest.rename(UPLOADS_DIR / new_name)
+        final_name = new_name
+
+    return {
+        "filename": final_name,
+        "size": len(content),
+        "hinmei": hinmei,
+        "renamed": hinmei is not None,
+    }
 
 
 @router.get("")

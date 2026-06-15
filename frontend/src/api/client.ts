@@ -20,6 +20,27 @@ export interface RenameResult {
   new_filename: string;
 }
 
+export interface AutoRenameResult {
+  filename: string;
+  size: number;
+  hinmei: string | null;
+  renamed: boolean;
+}
+
+export async function uploadFileAutoRename(file: File): Promise<AutoRenameResult> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const res = await fetch("/api/files/upload-auto-rename", {
+    method: "POST",
+    body: formData,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail ?? "Upload failed");
+  }
+  return res.json();
+}
+
 export async function uploadFile(file: File): Promise<UploadResult> {
   const formData = new FormData();
   formData.append("file", file);
