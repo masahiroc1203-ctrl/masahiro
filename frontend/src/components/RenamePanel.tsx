@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { executeRename, getContent, ContentResult } from "../api/client";
+import { executeRename, extractKeyword } from "../api/client";
 import { buildFilename, getStem } from "../utils/rename";
 
 interface Props {
@@ -10,27 +10,7 @@ interface Props {
 
 interface ExtractResult {
   keyword: string;
-  found: boolean;
-  context: string;
-  page: number | null;
-}
-
-function searchKeyword(content: ContentResult, keyword: string): ExtractResult {
-  const kw = keyword.trim();
-  if (!kw) return { keyword: kw, found: false, context: "", page: null };
-  for (const page of content.pages) {
-    const idx = page.text.indexOf(kw);
-    if (idx !== -1) {
-      const start = Math.max(0, idx - 25);
-      const end = Math.min(page.text.length, idx + kw.length + 25);
-      const context =
-        (start > 0 ? "…" : "") +
-        page.text.slice(start, end).replace(/\n/g, " ") +
-        (end < page.text.length ? "…" : "");
-      return { keyword: kw, found: true, context, page: page.page_num };
-    }
-  }
-  return { keyword: kw, found: false, context: "", page: null };
+  value: string | null;
 }
 
 export default function RenamePanel({ filename, onClose, onRenamed }: Props) {
@@ -45,8 +25,15 @@ export default function RenamePanel({ filename, onClose, onRenamed }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [renaming, setRenaming] = useState(false);
 
-  const preview = buildFilename(stem, kw1, kw2, kw3, withStem);
   const keywords = [kw1, kw2, kw3].filter((k) => k.trim());
+
+  // 抽出した値でプレビューを作成
+  const previewFromExtracted = (): string => {
+    if (!extractResults) return "";
+    const [v1, v2, v3] = extractResults.map((r) => r.value ?? "");
+    return buildFilename(stem, v1, v2, v3, withStem);
+  };
+  const preview = previewFromExtracted();
 
   const handleExtract = async () => {
     if (keywords.length === 0) {
@@ -58,10 +45,8 @@ export default function RenamePanel({ filename, onClose, onRenamed }: Props) {
     setConfirmed(false);
     setExtracting(true);
     try {
-      const content = await getContent(filename);
-      const results = [kw1, kw2, kw3]
-        .filter((k) => k.trim())
-        .map((k) => searchKeyword(content, k));
+      const activeKws = [kw1, kw2, kw3].filter((k) => k.trim());
+      const results = await Promise.all(activeKws.map((k) => extractKeyword(filename, k)));
       setExtractResults(results);
     } catch (e) {
       setError(e instanceof Error ? e.message : "抽出に失敗しました");
@@ -84,7 +69,6 @@ export default function RenamePanel({ filename, onClose, onRenamed }: Props) {
     }
   };
 
-  // キーワードが変わったら抽出結果と確認をリセット
   const handleKwChange = (setter: (v: string) => void) => (e: React.ChangeEvent<HTMLInputElement>) => {
     setter(e.target.value);
     setExtractResults(null);
@@ -105,40 +89,40 @@ export default function RenamePanel({ filename, onClose, onRenamed }: Props) {
           <label>ファイル名の形式</label>
           <div className="radio-group">
             <label className="radio-label">
-              <input type="radio" checked={withStem} onChange={() => setWithStem(true)} />
-              元ファイル名 + キーワード（例: {stem}_kw1_kw2.pdf）
+              <input type="radio" checked={withStem} onChange={() => { setWithStem(true); setExtractResults(null); setConfirmed(false); }} />
+              元ファイル名 + 抽出値（例: {stem}_フロントプレート.pdf）
             </label>
             <label className="radio-label">
-              <input type="radio" checked={!withStem} onChange={() => setWithStem(false)} />
-              キーワードのみ（例: kw1_kw2.pdf）
+              <input type="radio" checked={!withStem} onChange={() => { setWithStem(false); setExtractResults(null); setConfirmed(false); }} />
+              抽出値のみ（例: フロントプレート.pdf）
             </label>
           </div>
         </div>
 
         <div className="modal-field keyword-grid">
-          <label>キーワード 1 <span className="required">*</span></label>
+          <label>検索キーワード 1 <span className="required">*</span></label>
           <input
             type="text"
             value={kw1}
             onChange={handleKwChange(setKw1)}
             className="filename-input"
-            placeholder="キーワード1（必須）"
+            placeholder="例: 品名"
           />
-          <label>キーワード 2</label>
+          <label>検索キーワード 2</label>
           <input
             type="text"
             value={kw2}
             onChange={handleKwChange(setKw2)}
             className="filename-input"
-            placeholder="キーワード2（省略可）"
+            placeholder="例: 材質（省略可）"
           />
-          <label>キーワード 3</label>
+          <label>検索キーワード 3</label>
           <input
             type="text"
             value={kw3}
             onChange={handleKwChange(setKw3)}
             className="filename-input"
-            placeholder="キーワード3（省略可）"
+            placeholder="例: 図番（省略可）"
           />
         </div>
 
@@ -157,11 +141,11 @@ export default function RenamePanel({ filename, onClose, onRenamed }: Props) {
             <label>抽出結果</label>
             <ul className="extract-result-list">
               {extractResults.map((r) => (
-                <li key={r.keyword} className={r.found ? "extract-found" : "extract-not-found"}>
-                  <span className="extract-icon">{r.found ? "✅" : "❌"}</span>
+                <li key={r.keyword} className={r.value ? "extract-found" : "extract-not-found"}>
+                  <span className="extract-icon">{r.value ? "✅" : "❌"}</span>
                   <span className="extract-keyword">「{r.keyword}」</span>
-                  {r.found
-                    ? <span className="extract-context">ページ {r.page}：{r.context}</span>
+                  {r.value
+                    ? <span className="extract-context">→ {r.value}</span>
                     : <span className="extract-context">ファイル内に見つかりませんでした</span>
                   }
                 </li>
@@ -181,7 +165,7 @@ export default function RenamePanel({ filename, onClose, onRenamed }: Props) {
         {extractResults && (
           <div className="modal-field">
             <label>新しいファイル名（プレビュー）</label>
-            <p className="hinmei-value">{preview || "—"}</p>
+            <p className="hinmei-value">{preview || "— （値を抽出できませんでした）"}</p>
           </div>
         )}
 

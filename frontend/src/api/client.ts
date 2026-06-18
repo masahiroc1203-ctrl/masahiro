@@ -112,6 +112,27 @@ export async function getContent(filename: string): Promise<ContentResult> {
   return res.json();
 }
 
+export interface KeywordExtractResult {
+  keyword: string;
+  value: string | null;
+}
+
+export async function extractKeyword(
+  filename: string,
+  keyword: string
+): Promise<KeywordExtractResult> {
+  const res = await fetch(`/api/content/${encodeURIComponent(filename)}/extract-keyword`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ keyword }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail ?? "Extraction failed");
+  }
+  return res.json();
+}
+
 export interface MergeResult {
   output_filename: string;
   merged_count: number;

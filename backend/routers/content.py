@@ -3,12 +3,18 @@ from pathlib import Path
 
 import pdfplumber
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 
 import config
+from services.pdf_extractor import extract_value_by_keyword
 
 UPLOADS_DIR = config.UPLOADS_DIR
 
 router = APIRouter()
+
+
+class ExtractKeywordRequest(BaseModel):
+    keyword: str
 
 
 def safe_filename(filename: str) -> str:
@@ -42,3 +48,19 @@ async def get_text(filename: str):
         "total_pages": total_pages,
         "pages": pages,
     }
+
+
+@router.post("/{filename}/extract-keyword")
+async def extract_keyword_value(filename: str, body: ExtractKeywordRequest):
+    """キーワード（ラベル）に対応する値をPDFから抽出する"""
+    filename = safe_filename(filename)
+    path = UPLOADS_DIR / filename
+    if not path.exists() or not path.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+
+    try:
+        value = extract_value_by_keyword(str(path), body.keyword)
+    except Exception:
+        value = None
+
+    return {"keyword": body.keyword, "value": value}
