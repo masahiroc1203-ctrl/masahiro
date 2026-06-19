@@ -15,12 +15,24 @@ Claude Code ↔ 専用 Obsidian Vault の双方向連携スキル。コード以
 ### 2. スキルを配布
 リポジトリ正本（`masahiro/.claude/skills/obsidian-sync`）から:
 
+**macOS / Linux / Git Bash:**
 ```bash
 # ローカル全プロジェクト向け（+ Vault リポジトリにもミラー）
 .claude/skills/obsidian-sync/install.sh --vault ~/ObsidianVaults/claude-code-vault
 ```
 
-`~/.claude/obsidian-sync.json` が雛形から作られるので編集:
+**Windows（PowerShell）:**
+```powershell
+# cmd / PowerShell だけで完結（bash 不要）
+.\.claude\skills\obsidian-sync\install.ps1 -Vault "C:/Users/<you>/ObsidianVaults/claude-code-vault"
+```
+> 実行ポリシーで止まる場合は次のように一時許可で実行:
+> `powershell -ExecutionPolicy Bypass -File .\.claude\skills\obsidian-sync\install.ps1 -Vault "<vault>"`
+
+> ⚠️ Windows での **実行時**（スキルの `resolve-vault.sh` / `sync-vault.sh`）は bash が必要です。
+> Git for Windows 同梱の **Git Bash** が入っていれば Claude Code がそれを使って実行します。
+
+`~/.claude/obsidian-sync.json`（Windows は `%USERPROFILE%\.claude\obsidian-sync.json`）が雛形から作られるので編集:
 
 ```json
 {
