@@ -1,0 +1,61 @@
+name: Build Marlin Firmware
+
+on:
+  push:
+    branches:
+      - claude/ecstatic-dirac-X5bAn
+  workflow_dispatch:  # 手動実行も可能
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio/.cache
+          key: ${{ runner.os }}-pio-${{ hashFiles('MarlinFirmware/platformio.ini') }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install PlatformIO
+        run: pip install platformio
+
+      - name: Build firmware
+        run: |
+          cd MarlinFirmware
+          pio run -e STM32F103RE_creality
+
+      - name: Generate compile database
+        continue-on-error: true
+        run: |
+          cd MarlinFirmware
+          pio run -e STM32F103RE_creality -t compiledb
+
+      - name: Verify macros
+        continue-on-error: true
+        run: |
+          cd MarlinFirmware
+          python3 scripts/verify_macros.py
+
+      - name: Upload firmware binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-${{ github.sha }}
+          path: MarlinFirmware/.pio/build/STM32F103RE_creality/firmware-*.bin
+          retention-days: 30
+
+      - name: Upload macro verification report
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: macro-verify-${{ github.sha }}
+          path: MarlinFirmware/.pio/build/STM32F103RE_creality/macro_verify.txt
+          retention-days: 30
