@@ -116,160 +116,37 @@ Bed Leveling
 
 ## Gコード / Mコード リファレンス
 
-### G28 系 — ホーミング
+詳細は [[Marlin_Gcode_Reference]] を参照。
+
+### 主要コマンド早見表
 
 | コマンド | メニュー項目 | 動作 |
 |---------|------------|------|
 | `G28` | Auto Home | 全軸ホーミング |
-| `G28O` | M48 Probe Test（前処理） | 前回ホーム結果を使用（未ホーム時のみ実行） |
-
----
-
-### G29 P系 — UBLフェーズ操作
-
-| コマンド | メニュー項目 | 動作 |
-|---------|------------|------|
-| `G29NP1` | Step 1: Build Cold Mesh | ホームせずにフェーズ1（全点プロービング） |
-| `G29 P1` | Build Cold Mesh | G28後にフェーズ1 |
-| `G29P1C` | Continue Mesh | 中断したP1を再開 |
-| `G29P2BT0` | Manual Fill-in / Manual Mesh | 手動プローブで各点測定（LCDで誘導） |
-| `G29P3T0` | Smart Fill-in / Step 2 | 補間で未測定点を自動補完 |
-| `G29P3RC.{n}` | Fill-in Amount（スライダ） | 指定値でスムーズ補間（C=定数、R=繰返し） |
-| `G29P4RT` | Fine Tune All / Step 4, 6 | 全点をプローブで精密調整（R=全点、T=LCD表示） |
-| `G29P4T` | Fine Tune Closest | 最近点のみ精密調整 |
-| `G29P4X{x}Y{y}R{n}` | Mesh Editor（クリック時） | 指定座標の点をプローブで精密調整 |
-
----
-
-### G29 S / L 系 — メッシュ保存・読込
-
-| コマンド | メニュー項目 | 動作 |
-|---------|------------|------|
-| `G29S{n}` | Save Bed Mesh / Step 7 | スロットnにEEPROM保存 |
-| `G29L{n}` | Load Bed Mesh | スロットnからEEPROM読込 |
-| `G29S-1` | Off Printer Backup | メッシュをGコードとしてホスト（PC）へ出力 |
-
----
-
-### G29 I 系 — 無効化
-
-| コマンド | メニュー項目 | 動作 |
-|---------|------------|------|
-| `G29I999` | Manual Mesh（前処理） | 全点をNaN（未測定）にリセット |
-| `G29I` | Invalidate Closest | 最近点のみNaNにリセット |
-
----
-
-### G29 T 系 — 出力
-
-| コマンド | メニュー項目 | 動作 |
-|---------|------------|------|
-| `G29T0` | Output for Host | メッシュをシリアルへテキスト出力 |
-| `G29T1` | Output for CSV | メッシュをシリアルへCSV出力 |
-
----
-
-### G29 J 系 — 傾き補正
-
-| コマンド | メニュー項目 | 動作 |
-|---------|------------|------|
-| `G29J0` | 3-Point Mesh Leveling | 3点でベッド傾き補正 |
-| `G29J{n}` | Grid Mesh Leveling | nグリッドで傾き補正（n=2〜6） |
-
----
-
-### G29 W 系 — デバッグ情報 ⚠️
-
-| コマンド | メニュー項目 | 動作 |
-|---------|------------|------|
-| `G29W` | Output UBL Info | **要 `UBL_DEVEL_DEBUGGING`。通常ビルドでは完全無動作（Bug 1）** |
-
----
-
-### G26 系 — テスト印刷
-
-| コマンド | メニュー項目 | 動作 |
-|---------|------------|------|
-| `G28\nG26CPI{preset}` | Validate PLA / ABS | ホーム後にプリセット温度でテスト印刷 |
-| `G28\nG26CPH{hotend}B{bed}` | Validate Custom Mesh | カスタム温度でテスト印刷 |
-
----
-
-### M 系
-
-| コマンド | メニュー項目 | 動作 |
-|---------|------------|------|
-| `M48 P10` | M48 Probe Test | プローブ繰返し精度測定（10回） |
-| `M401` | Manual Deploy | BLTouch手動展開 |
-| `M402` | Manual Stow | BLTouch手動格納 |
+| `G29NP1` | Step 1: Build Cold Mesh | 全点プロービング（ホームスキップ） |
+| `G29 P1` | Build Cold Mesh | G28後に全点プロービング |
+| `G29P3T0` | Smart Fill-in | 補間で未測定点を自動補完 |
+| `G29P4RT` | Fine Tune All | 全点をプローブで精密調整 |
+| `G29S{n}` / `G29L{n}` | Save / Load Bed Mesh | EEPROMへ保存 / 読込 |
+| `G29T0` / `G29T1` | Output for Host / CSV | メッシュをシリアルへ出力 |
+| `G29S-1` | Off Printer Backup | メッシュをGコードとしてPC出力 |
+| `G29W` | Output UBL Info | **⚠️ 通常ビルドでは無動作（Bug 1）** |
+| `G26...` | Validate Mesh | テスト印刷で目視確認 |
+| `M401` / `M402` | Manual Deploy / Stow | BLTouch手動展開 / 格納 |
+| `M1004...` | Mesh Wizard | 温度指定ワンクリック作成（2.x以降） |
 | `M500` | Store Settings | 全設定をEEPROMへ保存 |
-| `M501` | Load Settings | EEPROMから設定を読込 |
-| `M502` | Reset Settings | 工場出荷時設定に戻す |
-| `M1004 B{bed}H{hotend}S{slot}` | Mesh Wizard | 温度・スロット指定でメッシュ作成（2.x以降） |
-
----
-
-### G29 パラメータ全一覧
-
-#### Marlin 1.1.x から存在（UBL初期実装）
-
-| パラメータ | 用途 | 備考 |
-|-----------|------|------|
-| `A` | UBL有効化 | `D` と同時指定不可 |
-| `D` | UBL無効化 | |
-| `P0〜P6` | フェーズ指定 | P5=平均補正、P6=高さシフト |
-| `S` / `L` | 保存 / 読込 | `S-1` でGコードとしてエクスポート |
-| `T` | トポロジーマップ出力 | `T0`=テキスト、`T1`=CSV |
-| `I` | 測定点を無効化（NaN化） | 値=個数。`I999`で全点 |
-| `J` | グリッド傾き補正 | `J0`=3点、`J2〜9`=グリッド |
-| `B` | ビジネスカード厚み測定 | P2と併用 |
-| `C` | 継続 / 定数（コンテキスト依存） | P1=継続、P3=補間定数 |
-| `H` | ノズル高さオフセット | P2/P4と併用 |
-| `R` | 繰返し回数 | 省略時=GRID_MAX_POINTS |
-| `E` | 各プローブ後にストウ | P1と併用 |
-| `V` | 詳細出力レベル（0〜4） | |
-| `F` | フェード高さ設定（mm） | |
-| `U` | 外周のみプローブ | P1と併用。素早い初期測定向け |
-| `X` / `Y` | 操作対象の座標指定 | |
-| `W` / `K` / `Q` | デバッグ専用 | 要 `UBL_DEVEL_DEBUGGING` |
-
-#### Marlin 2.x で追加
-
-| パラメータ / 機能 | 内容 |
-|-----------------|------|
-| `N`（内部用） | ホーム強制実行。`G29NP1` のようにメニューが内部で使用。ドキュメントに記載なし |
-| `P3.1〜P3.13` | 加重最小二乗法（WLSF）補間。距離の重み付けを調整できる。`UBL_G29_P31` で有効化 |
-| `UBL_HILBERT_CURVE` | P1プロービング順序をヒルベルト曲線順に変更（デフォルトはスパイラル） |
-| `M1004`（Mesh Wizard） | 温度・スロット指定ワンクリック作成。`UBL_MESH_WIZARD` で有効化 |
 
 ---
 
 ## 既知のバグ（コードレビュー結果）
 
+詳細は [[Marlin_Gcode_Reference#既知のバグ]] を参照。
+
 | # | 場所 | 内容 | 深刻度 |
 |---|------|------|--------|
-| Bug 1 | `menu_probe_level.cpp` | `G29W`（Output UBL Info）が `UBL_DEVEL_DEBUGGING` 未定義時に完全無動作。メニューには表示されるがシリアルに何も出力されない | 中 |
-| Bug 2 | `menu_ubl.cpp` `_lcd_ubl_build_custom_mesh()` | `HAS_HEATED_BED` 条件が逆転しており、ベッドヒーター搭載機（Ender 3 Pro）でカスタム温度設定が完全に無視される | **高** |
-| Bug 3 | `menu_ubl.cpp` `_menu_ubl_mesh_wizard()` | Mesh Wizardのスロット上限が `total_slots`（正しくは `total_slots - 1`）。Storage Meshメニューでは正しく `a - 1` を使用しているため不整合 | 低 |
-
-### Bug 2 詳細（Build Custom Mesh 温度無視）
-
-```cpp
-// 現在のコード（誤）
-#if HAS_HEATED_BED
-  sprintf_P(ubl_lcd_gcode, PSTR("G28\nG29 P1"));          // 温度コマンドなし！
-#else
-  sprintf_P(ubl_lcd_gcode, PSTR("G28\nM109 S%i\nG29 P1"), custom_hotend_temp);
-#endif
-
-// 正しいコード
-#if HAS_HEATED_BED
-  sprintf_P(ubl_lcd_gcode, PSTR("G28\nM190 S%i\nM109 S%i\nG29 P1"),
-            custom_bed_temp, custom_hotend_temp);
-#else
-  sprintf_P(ubl_lcd_gcode, PSTR("G28\nM109 S%i\nG29 P1"), custom_hotend_temp);
-#endif
-```
+| Bug 1 | `menu_probe_level.cpp` | `G29W` が `UBL_DEVEL_DEBUGGING` 未定義時に完全無動作 | 中 |
+| Bug 2 | `menu_ubl.cpp` | Build Custom Mesh の `HAS_HEATED_BED` 条件逆転 → 温度設定が無視される | **高** |
+| Bug 3 | `menu_ubl.cpp` | Mesh Wizard のスロット上限が `total_slots`（正しくは `total_slots - 1`） | 低 |
 
 ---
 
