@@ -1,28 +1,15 @@
 Attribute VB_Name = "modChartFormatter"
 Option Explicit
 
-' =================================================================
-' グラフ書式設定マクロ - メインモジュール
-'
-' 【インポート手順】
-'   1. このファイル(modChartFormatter.bas)をVBAエディタでインポート
-'   2. frmChartFormatter.frm をVBAエディタでインポート
-'   3. ThisWorkbook に以下を追加:
-'        Private Sub Workbook_Open()
-'            modChartFormatter.AddChartContextMenu
-'        End Sub
-'        Private Sub Workbook_BeforeClose(Cancel As Boolean)
-'            modChartFormatter.RemoveChartContextMenu
-'        End Sub
-'   4. 今すぐ有効にする: AddChartContextMenu マクロを実行
-'   5. グラフを右クリック → "グラフ書式設定..." を選択
-' =================================================================
+' ==============================================================
+' グラフ書式設定マクロ - チャートロジックモジュール
+' ==============================================================
 
 Private Const MENU_CAPTION As String = "グラフ書式設定(&F)..."
 
-' -----------------------------------------------------------------
+' --------------------------------------------------------------
 ' コンテキストメニュー管理
-' -----------------------------------------------------------------
+' --------------------------------------------------------------
 
 Public Sub AddChartContextMenu()
     Dim oBar As CommandBar
@@ -50,9 +37,9 @@ Public Sub RemoveChartContextMenu()
     On Error GoTo 0
 End Sub
 
-' -----------------------------------------------------------------
+' --------------------------------------------------------------
 ' フォーム表示
-' -----------------------------------------------------------------
+' --------------------------------------------------------------
 
 Public Sub ShowChartFormatter()
     If ActiveChart Is Nothing Then
@@ -64,9 +51,9 @@ Public Sub ShowChartFormatter()
     frmChartFormatter.Show vbModeless
 End Sub
 
-' -----------------------------------------------------------------
+' --------------------------------------------------------------
 ' 軸ラベル設定
-' -----------------------------------------------------------------
+' --------------------------------------------------------------
 
 Public Sub SetAxisTitle(cht As Chart, axisType As XlAxisType, _
                         hasTitle As Boolean, titleText As String)
@@ -78,9 +65,9 @@ Public Sub SetAxisTitle(cht As Chart, axisType As XlAxisType, _
     On Error GoTo 0
 End Sub
 
-' -----------------------------------------------------------------
+' --------------------------------------------------------------
 ' グラフサイズ設定
-' -----------------------------------------------------------------
+' --------------------------------------------------------------
 
 Public Sub SetChartSize(cht As Chart, w As Double, h As Double, useCm As Boolean)
     Dim obj As Object
@@ -100,13 +87,13 @@ Public Sub SetChartSize(cht As Chart, w As Double, h As Double, useCm As Boolean
     End If
 End Sub
 
-' -----------------------------------------------------------------
+' --------------------------------------------------------------
 ' フォント設定
-' -----------------------------------------------------------------
+' targetFlags ビット: 1=ChartArea, 2=Title, 4=Axes, 8=Legend
+' --------------------------------------------------------------
 
 Public Sub SetChartFont(cht As Chart, fontName As String, fontSize As Double, _
                         bold As Boolean, italic As Boolean, targetFlags As Integer)
-    ' targetFlags ビット: 1=ChartArea, 2=Title, 4=Axes, 8=Legend
     On Error Resume Next
 
     If targetFlags And 1 Then
@@ -146,9 +133,9 @@ Private Sub ApplyFontToObj(oFont As Object, fontName As String, fontSize As Doub
     oFont.Italic = italic
 End Sub
 
-' -----------------------------------------------------------------
+' --------------------------------------------------------------
 ' 枠線設定
-' -----------------------------------------------------------------
+' --------------------------------------------------------------
 
 Public Sub SetChartBorder(cht As Chart, isOuter As Boolean, _
                            show As Boolean, lineStyle As Long, _
@@ -172,9 +159,9 @@ Public Sub SetChartBorder(cht As Chart, isOuter As Boolean, _
 ErrExit:
 End Sub
 
-' -----------------------------------------------------------------
-' ユーティリティ関数（フォームから呼び出し）
-' -----------------------------------------------------------------
+' --------------------------------------------------------------
+' ユーティリティ（modFormLogic から呼び出し）
+' --------------------------------------------------------------
 
 Public Function ColorNameToRGB(colorName As String) As Long
     Select Case colorName
@@ -184,10 +171,10 @@ Public Function ColorNameToRGB(colorName As String) As Long
         Case "青":       ColorNameToRGB = RGB(0, 70, 127)
         Case "緑":       ColorNameToRGB = RGB(0, 112, 0)
         Case "黄":       ColorNameToRGB = RGB(255, 217, 0)
-        Case "オレンジ": ColorNameToRGB = RGB(255, 127, 0)
+        Case "橙":       ColorNameToRGB = RGB(255, 127, 0)
         Case "紫":       ColorNameToRGB = RGB(112, 48, 160)
-        Case "グレー":   ColorNameToRGB = RGB(127, 127, 127)
-        Case "水色":     ColorNameToRGB = RGB(0, 176, 240)
+        Case "灰":       ColorNameToRGB = RGB(127, 127, 127)
+        Case "水":       ColorNameToRGB = RGB(0, 176, 240)
         Case Else:       ColorNameToRGB = RGB(0, 0, 0)
     End Select
 End Function
