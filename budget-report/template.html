@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>月次収支レポート</title>
+<style>
+  .viz-root {
+    --surface-1: #fcfcfb;
+    --page: #f9f9f7;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #898781;
+    --grid: #e1e0d9;
+    --baseline: #c3c2b7;
+    --border: rgba(11, 11, 11, 0.10);
+    --good: #006300;
+    --bad: #d03b3b;
+    --accent: #2a78d6;
+    --neg: #e34948;
+    --spark: #898781;
+    --s1: #2a78d6; --s2: #1baf7a; --s3: #eda100; --s4: #008300;
+    --s5: #4a3aa7; --s6: #e34948; --s7: #e87ba4; --s8: #eb6834;
+  }
+  @media (prefers-color-scheme: dark) {
+    .viz-root {
+      --surface-1: #1a1a19;
+      --page: #0d0d0d;
+      --text-primary: #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted: #898781;
+      --grid: #2c2c2a;
+      --baseline: #383835;
+      --border: rgba(255, 255, 255, 0.10);
+      --good: #0ca30c;
+      --bad: #d03b3b;
+      --accent: #3987e5;
+      --neg: #e66767;
+      --s1: #3987e5; --s2: #199e70; --s3: #c98500; --s4: #008300;
+      --s5: #9085e9; --s6: #e66767; --s7: #d55181; --s8: #d95926;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--page); }
+  .viz-root {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    color: var(--text-primary);
+    background: var(--page);
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 24px 16px 48px;
+  }
+  header h1 { font-size: 20px; font-weight: 650; }
+  header p { color: var(--text-muted); font-size: 12px; margin-top: 2px; }
+
+  .filters { display: flex; gap: 8px; margin: 16px 0 12px; }
+  .filters button {
+    font: inherit; font-size: 13px; color: var(--text-secondary);
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 8px; padding: 6px 12px; cursor: pointer;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .filters button:hover { border-color: var(--baseline); }
+  .filters button[aria-pressed="true"] { color: var(--text-primary); font-weight: 600; }
+  .filters button .check { display: none; font-size: 14px; font-weight: 700; line-height: 1; }
+  .filters button[aria-pressed="true"] .check { display: inline; }
+
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+  .tile {
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px 16px;
+  }
+  .tile .label { font-size: 12px; color: var(--text-muted); }
+  .tile .value { font-size: 26px; font-weight: 600; margin-top: 4px; }
+  .tile .delta { font-size: 12px; margin-top: 4px; color: var(--text-muted); }
+  .tile .delta .dir-good { color: var(--good); font-weight: 600; }
+  .tile .delta .dir-bad { color: var(--bad); font-weight: 600; }
+  .tile svg { display: block; margin-top: 8px; }
+
+  .card {
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 12px; padding: 16px; margin-top: 12px; position: relative;
+  }
+  .card h2 { font-size: 14px; font-weight: 600; }
+  .card .sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; }
+  .legend .item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); }
+  .legend .swatch { width: 10px; height: 10px; border-radius: 2px; }
+  .chart { margin-top: 8px; }
+  .chart svg { display: block; width: 100%; }
+  .chart text { font-family: inherit; font-size: 11px; fill: var(--text-muted); }
+  .chart text.tick { font-variant-numeric: tabular-nums; }
+  .chart .dlabel { fill: var(--text-secondary); font-weight: 600; }
+  .hover-band { fill: var(--text-primary); opacity: 0; }
+  .lift { filter: brightness(1.12); }
+
+  .tooltip {
+    position: absolute; pointer-events: none; z-index: 10; display: none;
+    background: var(--surface-1); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 10px; box-shadow: 0 4px 16px rgba(0,0,0,.14);
+    font-size: 12px; min-width: 150px;
+  }
+  .tooltip .tt-title { color: var(--text-muted); margin-bottom: 4px; }
+  .tooltip .tt-row { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
+  .tooltip .tt-key { width: 12px; height: 3px; border-radius: 2px; flex: none; }
+  .tooltip .tt-val { font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-primary); }
+  .tooltip .tt-name { color: var(--text-secondary); }
+
+  table.summary { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
+  table.summary th {
+    text-align: right; font-weight: 500; color: var(--text-muted);
+    padding: 6px 10px; border-bottom: 1px solid var(--grid);
+  }
+  table.summary th:first-child, table.summary td:first-child { text-align: left; }
+  table.summary td {
+    text-align: right; padding: 6px 10px; border-bottom: 1px solid var(--grid);
+    font-variant-numeric: tabular-nums; color: var(--text-secondary);
+  }
+  table.summary td.net-pos { color: var(--good); }
+  table.summary td.net-neg { color: var(--bad); }
+</style>
+</head>
+<body>
+<div class="viz-root">
+  <header>
+    <h1>月次収支レポート</h1>
+    <p id="generated"></p>
+  </header>
+
+  <div class="filters" id="filters" role="group" aria-label="表示期間"></div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <section class="card">
+    <h2>収入と支出の推移</h2>
+    <div class="legend" id="legend-flow"></div>
+    <div class="chart" id="chart-flow"></div>
+    <div class="tooltip" id="tt-flow"></div>
+  </section>
+
+  <section class="card">
+    <h2>月次収支(収入 − 支出)</h2>
+    <p class="sub">0 より上が黒字、下が赤字</p>
+    <div class="chart" id="chart-net"></div>
+    <div class="tooltip" id="tt-net"></div>
+  </section>
+
+  <section class="card">
+    <h2>カテゴリ別支出の内訳</h2>
+    <div class="legend" id="legend-cat"></div>
+    <div class="chart" id="chart-cat"></div>
+    <div class="tooltip" id="tt-cat"></div>
+  </section>
+
+  <section class="card">
+    <h2>月次サマリー</h2>
+    <table class="summary" id="summary"></table>
+  </section>
+</div>
+
+<script>
+const DATA = __PAYLOAD__;
+const SVGNS = "http://www.w3.org/2000/svg";
+const CAT_COLORS = ["var(--s1)","var(--s2)","var(--s3)","var(--s4)","var(--s5)","var(--s6)","var(--s7)","var(--s8)"];
+const state = { range: DATA.months.length > 12 ? 12 : 0 };
+
+// ---------- 整形ユーティリティ ----------
+const yen = n => "¥" + Math.round(n).toLocaleString("ja-JP");
+const signedYen = n => (n > 0 ? "+" : n < 0 ? "−" : "±") + yen(Math.abs(n));
+const jpMonth = m => `${+m.slice(0, 4)}年${+m.slice(5)}月`;
+function axisLabel(n) {
+  if (n === 0) return "0";
+  const sign = n < 0 ? "−" : "";
+  const a = Math.abs(n);
+  if (a >= 1e8) return sign + trim(a / 1e8) + "億";
+  if (a >= 1e4) return sign + trim(a / 1e4) + "万";
+  return sign + a.toLocaleString("ja-JP");
+}
+const trim = x => (Math.round(x * 10) / 10).toString();
+function monthLabel(m) { return parseInt(m.slice(5), 10) + "月"; }
+
+function niceStep(rough) {
+  const pow = Math.pow(10, Math.floor(Math.log10(rough)));
+  for (const c of [1, 2, 2.5, 5, 10]) if (c * pow >= rough) return c * pow;
+  return 10 * pow;
+}
+function makeScale(min, max, targetTicks) {
+  const step = niceStep((max - min) / targetTicks || 1);
+  const lo = Math.floor(min / step) * step;
+  const hi = Math.ceil(max / step) * step;
+  const ticks = [];
+  for (let v = lo; v <= hi + step / 2; v += step) ticks.push(v);
+  return { lo, hi: Math.max(hi, lo + step), ticks };
+}
+
+function el(tag, attrs, parent) {
+  const e = document.createElementNS(SVGNS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+// データ側の端だけ 4px 丸めた棒(ベースライン側は直角)
+function roundedBar(x, y, w, h, up) {
+  const r = Math.min(4, w / 2, h);
+  if (h <= 0) return "";
+  if (up) {
+    return `M${x},${y + h} L${x},${y + r} Q${x},${y} ${x + r},${y} L${x + w - r},${y} Q${x + w},${y} ${x + w},${y + r} L${x + w},${y + h} Z`;
+  }
+  return `M${x},${y} L${x + w},${y} L${x + w},${y + h - r} Q${x + w},${y + h} ${x + w - r},${y + h} L${x + r},${y + h} Q${x},${y + h} ${x},${y + h - r} Z`;
+}
+
+// ---------- 選択期間のスライス ----------
+function slice() {
+  const n = state.range === 0 ? DATA.months.length : state.range;
+  const s = Math.max(0, DATA.months.length - n);
+  const months = DATA.months.slice(s);
+  const income = DATA.income.slice(s);
+  const expense = DATA.expense.slice(s);
+  const net = months.map((_, i) => income[i] - expense[i]);
+  const cats = {};
+  for (const c of DATA.categories) cats[c] = DATA.categorySeries[c].slice(s);
+  return { months, income, expense, net, cats };
+}
+
+// ---------- ツールチップ ----------
+function bindTooltip(card, tip, svg, plot, xOf, bandW, rows) {
+  // rows(i) => {title, items: [{color, value, name}]}
+  const months = plot.months;
+  const band = el("rect", { class: "hover-band", y: plot.top, height: plot.h, x: 0, width: bandW, rx: 6 }, svg);
+  band.style.opacity = 0;
+  const hits = el("g", {}, svg);
+  months.forEach((m, i) => {
+    const hit = el("rect", {
+      x: xOf(i) - bandW / 2, y: plot.top, width: bandW, height: plot.h,
+      fill: "transparent", tabindex: 0
+    }, hits);
+    const show = (clientX, clientY) => {
+      band.setAttribute("x", xOf(i) - bandW / 2);
+      band.style.opacity = 0.05;
+      svg.querySelectorAll(".mark").forEach(mk =>
+        mk.classList.toggle("lift", mk.dataset.i === String(i)));
+      const info = rows(i);
+      tip.replaceChildren();
+      const t = document.createElement("div");
+      t.className = "tt-title";
+      t.textContent = info.title;
+      tip.appendChild(t);
+      for (const it of info.items) {
+        const row = document.createElement("div");
+        row.className = "tt-row";
+        const key = document.createElement("span");
+        key.className = "tt-key";
+        key.style.background = it.color;
+        const val = document.createElement("span");
+        val.className = "tt-val";
+        val.textContent = it.value;
+        const name = document.createElement("span");
+        name.className = "tt-name";
+        name.textContent = it.name;
+        row.append(key, val, name);
+        tip.appendChild(row);
+      }
+      tip.style.display = "block";
+      const cr = card.getBoundingClientRect();
+      const tw = tip.offsetWidth, th = tip.offsetHeight;
+      let left = clientX - cr.left + 14;
+      if (left + tw > cr.width - 8) left = clientX - cr.left - tw - 14;
+      let top = clientY - cr.top - th - 10;
+      if (top < 4) top = clientY - cr.top + 14;
+      tip.style.left = left + "px";
+      tip.style.top = top + "px";
+    };
+    hit.addEventListener("pointermove", e => show(e.clientX, e.clientY));
+    hit.addEventListener("focus", () => {
+      const r = hit.getBoundingClientRect();
+      show(r.left + r.width / 2, r.top);
+    });
+    const hide = () => {
+      tip.style.display = "none";
+      band.style.opacity = 0;
+      svg.querySelectorAll(".mark").forEach(mk => mk.classList.remove("lift"));
+    };
+    hit.addEventListener("pointerleave", hide);
+    hit.addEventListener("blur", hide);
+  });
+}
+
+// ---------- チャート骨格(軸・グリッド) ----------
+function frame(container, hi, lo) {
+  const W = Math.max(320, container.clientWidth);
+  const H = 260;
+  const M = { top: 12, right: 12, bottom: 26, left: 52 };
+  const plotW = W - M.left - M.right, plotH = H - M.top - M.bottom;
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, width: W, height: H });
+  container.replaceChildren(svg);
+  const yOf = v => M.top + plotH * (1 - (v - lo) / (hi - lo));
+  return { svg, W, H, M, plotW, plotH, yOf };
+}
+function drawGrid(f, ticks) {
+  for (const v of ticks) {
+    const y = f.yOf(v);
+    el("line", {
+      x1: f.M.left, x2: f.W - f.M.right, y1: y, y2: y,
+      stroke: v === 0 ? "var(--baseline)" : "var(--grid)", "stroke-width": 1
+    }, f.svg);
+    el("text", { x: f.M.left - 8, y: y + 4, "text-anchor": "end", class: "tick" }, f.svg)
+      .textContent = axisLabel(v);
+  }
+}
+function drawMonthAxis(f, months, xOf) {
+  const every = months.length > 18 ? 2 : 1;
+  months.forEach((m, i) => {
+    if (i % every !== 0) return;
+    const withYear = i === 0 || m.slice(5) === "01";
+    const t = el("text", { x: xOf(i), y: f.H - 8, "text-anchor": "middle" }, f.svg);
+    t.textContent = withYear ? m.slice(0, 4) + "年" + monthLabel(m) : monthLabel(m);
+  });
+}
+
+// ---------- 1. 収入と支出(グループ棒) ----------
+function renderFlow(d) {
+  const container = document.getElementById("chart-flow");
+  const card = container.closest(".card");
+  const maxV = Math.max(...d.income, ...d.expense, 1);
+  const sc = makeScale(0, maxV, 4);
+  const f = frame(container, sc.hi, 0);
+  drawGrid(f, sc.ticks.filter(v => v >= 0));
+
+  const n = d.months.length;
+  const band = f.plotW / n;
+  const xOf = i => f.M.left + band * (i + 0.5);
+  const barW = Math.min(24, Math.max(4, (band - 8) / 2 - 1));
+  d.months.forEach((m, i) => {
+    const cx = xOf(i);
+    const yI = f.yOf(d.income[i]), yE = f.yOf(d.expense[i]);
+    el("path", { d: roundedBar(cx - barW - 1, yI, barW, f.yOf(0) - yI, true),
+      fill: "var(--s1)", class: "mark", "data-i": i }, f.svg);
+    el("path", { d: roundedBar(cx + 1, yE, barW, f.yOf(0) - yE, true),
+      fill: "var(--s6)", class: "mark", "data-i": i }, f.svg);
+  });
+  drawMonthAxis(f, d.months, xOf);
+
+  legend("legend-flow", [["収入", "var(--s1)"], ["支出", "var(--s6)"]]);
+  bindTooltip(card, document.getElementById("tt-flow"), f.svg,
+    { months: d.months, top: f.M.top, h: f.plotH }, xOf, band, i => ({
+      title: jpMonth(d.months[i]),
+      items: [
+        { color: "var(--s1)", value: yen(d.income[i]), name: "収入" },
+        { color: "var(--s6)", value: yen(d.expense[i]), name: "支出" },
+        { color: "var(--text-muted)", value: signedYen(d.net[i]), name: "収支" },
+      ],
+    }));
+}
+
+// ---------- 2. 月次収支(ダイバージング棒) ----------
+function renderNet(d) {
+  const container = document.getElementById("chart-net");
+  const card = container.closest(".card");
+  const lo = Math.min(0, ...d.net), hi = Math.max(0, ...d.net, 1);
+  const sc = makeScale(lo, hi, 4);
+  const f = frame(container, sc.hi, sc.lo);
+  drawGrid(f, sc.ticks);
+
+  const n = d.months.length;
+  const band = f.plotW / n;
+  const xOf = i => f.M.left + band * (i + 0.5);
+  const barW = Math.min(24, Math.max(6, band - 10));
+  const y0 = f.yOf(0);
+  const iMax = d.net.indexOf(Math.max(...d.net));
+  const iMin = d.net.indexOf(Math.min(...d.net));
+  d.months.forEach((m, i) => {
+    const v = d.net[i];
+    const y = f.yOf(v);
+    const up = v >= 0;
+    const h = Math.abs(y0 - y);
+    el("path", {
+      d: up ? roundedBar(xOf(i) - barW / 2, y, barW, h, true)
+            : roundedBar(xOf(i) - barW / 2, y0, barW, h, false),
+      fill: up ? "var(--s1)" : "var(--neg)", class: "mark", "data-i": i
+    }, f.svg);
+    if ((i === iMax || (i === iMin && iMin !== iMax)) && h > 6) { // 極値のみ直接ラベル
+      el("text", {
+        x: xOf(i), y: up ? y - 6 : y0 + h + 12, "text-anchor": "middle", class: "dlabel"
+      }, f.svg).textContent = axisLabel(v);
+    }
+  });
+  drawMonthAxis(f, d.months, xOf);
+
+  bindTooltip(card, document.getElementById("tt-net"), f.svg,
+    { months: d.months, top: f.M.top, h: f.plotH }, xOf, band, i => ({
+      title: jpMonth(d.months[i]),
+      items: [{
+        color: d.net[i] >= 0 ? "var(--s1)" : "var(--neg)",
+        value: signedYen(d.net[i]), name: "収支"
+      }],
+    }));
+}
+
+// ---------- 3. カテゴリ別支出(積み上げ棒) ----------
+function renderCategories(d) {
+  const container = document.getElementById("chart-cat");
+  const card = container.closest(".card");
+  const cats = DATA.categories;
+  const totals = d.months.map((_, i) => cats.reduce((s, c) => s + d.cats[c][i], 0));
+  const sc = makeScale(0, Math.max(...totals, 1), 4);
+  const f = frame(container, sc.hi, 0);
+  drawGrid(f, sc.ticks.filter(v => v >= 0));
+
+  const n = d.months.length;
+  const band = f.plotW / n;
+  const xOf = i => f.M.left + band * (i + 0.5);
+  const barW = Math.min(24, Math.max(6, band - 10));
+  d.months.forEach((m, i) => {
+    let acc = 0;
+    cats.forEach((c, ci) => {
+      const v = d.cats[c][i];
+      if (v <= 0) return;
+      const isTopSeg = acc + v >= totals[i] - 0.5;
+      // セグメント間は 2px のサーフェスギャップ(最上段はギャップなし)
+      const yTop = f.yOf(acc + v) + (isTopSeg ? 0 : 2);
+      const yBot = f.yOf(acc);
+      const h = yBot - yTop;
+      if (h > 0.5) {
+        el("path", {
+          d: isTopSeg ? roundedBar(xOf(i) - barW / 2, yTop, barW, h, true)
+                      : `M${xOf(i) - barW / 2},${yTop} h${barW} v${h} h${-barW} Z`,
+          fill: CAT_COLORS[ci % 8], class: "mark", "data-i": i
+        }, f.svg);
+      }
+      acc += v;
+    });
+  });
+  drawMonthAxis(f, d.months, xOf);
+
+  legend("legend-cat", cats.map((c, ci) => [c, CAT_COLORS[ci % 8]]));
+  bindTooltip(card, document.getElementById("tt-cat"), f.svg,
+    { months: d.months, top: f.M.top, h: f.plotH }, xOf, band, i => ({
+      title: jpMonth(d.months[i]) + " 支出 " + yen(totals[i]),
+      items: cats.map((c, ci) => ({
+        color: CAT_COLORS[ci % 8], value: yen(d.cats[c][i]), name: c
+      })).filter(it => it.value !== "¥0"),
+    }));
+}
+
+// ---------- KPI タイル ----------
+function sparkline(values) {
+  const w = 120, h = 28, pad = 4;
+  const lo = Math.min(...values), hi = Math.max(...values);
+  const span = hi - lo || 1;
+  const x = i => pad + (w - 2 * pad) * (values.length < 2 ? 0.5 : i / (values.length - 1));
+  const y = v => pad + (h - 2 * pad) * (1 - (v - lo) / span);
+  const svg = el("svg", { viewBox: `0 0 ${w} ${h}`, width: w, height: h });
+  el("path", {
+    d: values.map((v, i) => (i ? "L" : "M") + x(i) + "," + y(v)).join(" "),
+    fill: "none", stroke: "var(--spark)", "stroke-width": 2,
+    "stroke-linecap": "round", "stroke-linejoin": "round"
+  }, svg);
+  const li = values.length - 1;
+  el("circle", { cx: x(li), cy: y(values[li]), r: 4, fill: "var(--accent)",
+    stroke: "var(--surface-1)", "stroke-width": 2 }, svg);
+  return svg;
+}
+function tile(label, value, delta, upIsGood, spark) {
+  const t = document.createElement("div");
+  t.className = "tile";
+  const l = document.createElement("div"); l.className = "label"; l.textContent = label;
+  const v = document.createElement("div"); v.className = "value"; v.textContent = value;
+  t.append(l, v);
+  const d = document.createElement("div");
+  d.className = "delta";
+  if (delta === null) {
+    d.textContent = "前月データなし";
+  } else {
+    const s = document.createElement("span");
+    const good = (delta >= 0) === upIsGood;
+    s.className = good ? "dir-good" : "dir-bad";
+    s.textContent = (delta >= 0 ? "▲ " : "▼ ") + yen(Math.abs(delta));
+    d.append(s, document.createTextNode(" 前月比"));
+  }
+  t.appendChild(d);
+  if (spark) t.appendChild(spark);
+  return t;
+}
+function renderKpis(d) {
+  const box = document.getElementById("kpis");
+  box.replaceChildren();
+  const i = d.months.length - 1, p = i - 1;
+  const dd = k => (p >= 0 ? d[k][i] - d[k][p] : null);
+  const [y, m] = d.months[i].split("-");
+  const title = `${y}年${parseInt(m, 10)}月`;
+  box.append(
+    tile(`${title}の収入`, yen(d.income[i]), dd("income"), true),
+    tile(`${title}の支出`, yen(d.expense[i]), dd("expense"), false),
+    tile(`${title}の収支`, signedYen(d.net[i]), dd("net"), true,
+      sparkline(d.net.slice(-12)))
+  );
+}
+
+// ---------- 凡例・表・フィルタ ----------
+function legend(id, entries) {
+  const box = document.getElementById(id);
+  box.replaceChildren();
+  for (const [name, color] of entries) {
+    const it = document.createElement("span");
+    it.className = "item";
+    const sw = document.createElement("span");
+    sw.className = "swatch";
+    sw.style.background = color;
+    const tx = document.createElement("span");
+    tx.textContent = name;
+    it.append(sw, tx);
+    box.appendChild(it);
+  }
+}
+function renderTable(d) {
+  const table = document.getElementById("summary");
+  table.replaceChildren();
+  const thead = table.createTHead().insertRow();
+  for (const h of ["月", "収入", "支出", "収支"]) {
+    const th = document.createElement("th");
+    th.textContent = h;
+    thead.appendChild(th);
+  }
+  const body = table.createTBody();
+  for (let i = d.months.length - 1; i >= 0; i--) {
+    const r = body.insertRow();
+    const [y, m] = d.months[i].split("-");
+    r.insertCell().textContent = `${y}年${parseInt(m, 10)}月`;
+    r.insertCell().textContent = yen(d.income[i]);
+    r.insertCell().textContent = yen(d.expense[i]);
+    const net = r.insertCell();
+    net.textContent = signedYen(d.net[i]);
+    net.className = d.net[i] >= 0 ? "net-pos" : "net-neg";
+  }
+}
+function renderFilters() {
+  const box = document.getElementById("filters");
+  box.replaceChildren();
+  const presets = [[6, "直近6ヶ月"], [12, "直近12ヶ月"], [0, "全期間"]];
+  for (const [months, name] of presets) {
+    if (months > 0 && DATA.months.length <= months) continue;
+    const b = document.createElement("button");
+    b.setAttribute("aria-pressed", String(state.range === months));
+    const ck = document.createElement("span");
+    ck.className = "check";
+    ck.textContent = "✓";
+    const tx = document.createElement("span");
+    tx.textContent = name;
+    b.append(ck, tx);
+    b.addEventListener("click", () => { state.range = months; renderAll(); });
+    box.appendChild(b);
+  }
+}
+
+function renderAll() {
+  const d = slice();
+  renderFilters();
+  renderKpis(d);
+  renderFlow(d);
+  renderNet(d);
+  renderCategories(d);
+  renderTable(d);
+}
+
+document.getElementById("generated").textContent =
+  `${DATA.generatedAt} 生成 · ${DATA.months[0]} 〜 ${DATA.months[DATA.months.length - 1]}`;
+renderAll();
+let rid;
+addEventListener("resize", () => { clearTimeout(rid); rid = setTimeout(renderAll, 150); });
+</script>
+</body>
+</html>
