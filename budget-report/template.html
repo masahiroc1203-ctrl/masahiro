@@ -19,6 +19,7 @@
     --accent: #2a78d6;
     --neg: #e34948;
     --spark: #898781;
+    --dim: #c3c2b7;
     --s1: #2a78d6; --s2: #1baf7a; --s3: #eda100; --s4: #008300;
     --s5: #4a3aa7; --s6: #e34948; --s7: #e87ba4; --s8: #eb6834;
   }
@@ -36,6 +37,7 @@
       --bad: #d03b3b;
       --accent: #3987e5;
       --neg: #e66767;
+      --dim: #383835;
       --s1: #3987e5; --s2: #199e70; --s3: #c98500; --s4: #008300;
       --s5: #9085e9; --s6: #e66767; --s7: #d55181; --s8: #d95926;
     }
@@ -85,6 +87,9 @@
   .card .sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
   .legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; }
   .legend .item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); }
+  .legend .item.clickable { cursor: pointer; user-select: none; }
+  .legend .item.clickable:hover { color: var(--text-primary); }
+  .legend .item.dimmed { opacity: 0.35; }
   .legend .swatch { width: 10px; height: 10px; border-radius: 2px; }
   .chart { margin-top: 8px; }
   .chart svg { display: block; width: 100%; }
@@ -147,9 +152,17 @@
 
   <section class="card">
     <h2>カテゴリ別支出の内訳</h2>
+    <p class="sub">凡例をクリックすると1カテゴリを強調表示(もう一度クリックで解除)</p>
     <div class="legend" id="legend-cat"></div>
     <div class="chart" id="chart-cat"></div>
     <div class="tooltip" id="tt-cat"></div>
+  </section>
+
+  <section class="card">
+    <h2>カテゴリ別支出の合計</h2>
+    <p class="sub" id="catbar-period"></p>
+    <div class="chart" id="chart-catbar"></div>
+    <div class="tooltip" id="tt-catbar"></div>
   </section>
 
   <section class="card">
@@ -162,7 +175,7 @@
 const DATA = __PAYLOAD__;
 const SVGNS = "http://www.w3.org/2000/svg";
 const CAT_COLORS = ["var(--s1)","var(--s2)","var(--s3)","var(--s4)","var(--s5)","var(--s6)","var(--s7)","var(--s8)"];
-const state = { range: DATA.months.length > 12 ? 12 : 0 };
+const state = { range: DATA.months.length > 12 ? 12 : 0, catFocus: null };
 
 // ---------- 整形ユーティリティ ----------
 const yen = n => "¥" + Math.round(n).toLocaleString("ja-JP");
@@ -223,6 +236,39 @@ function slice() {
 }
 
 // ---------- ツールチップ ----------
+function fillTip(tip, info) {
+  tip.replaceChildren();
+  const t = document.createElement("div");
+  t.className = "tt-title";
+  t.textContent = info.title;
+  tip.appendChild(t);
+  for (const it of info.items) {
+    const row = document.createElement("div");
+    row.className = "tt-row";
+    const key = document.createElement("span");
+    key.className = "tt-key";
+    key.style.background = it.color;
+    const val = document.createElement("span");
+    val.className = "tt-val";
+    val.textContent = it.value;
+    const name = document.createElement("span");
+    name.className = "tt-name";
+    name.textContent = it.name;
+    row.append(key, val, name);
+    tip.appendChild(row);
+  }
+}
+function placeTip(card, tip, clientX, clientY) {
+  tip.style.display = "block";
+  const cr = card.getBoundingClientRect();
+  const tw = tip.offsetWidth, th = tip.offsetHeight;
+  let left = clientX - cr.left + 14;
+  if (left + tw > cr.width - 8) left = clientX - cr.left - tw - 14;
+  let top = clientY - cr.top - th - 10;
+  if (top < 4) top = clientY - cr.top + 14;
+  tip.style.left = left + "px";
+  tip.style.top = top + "px";
+}
 function bindTooltip(card, tip, svg, plot, xOf, bandW, rows) {
   // rows(i) => {title, items: [{color, value, name}]}
   const months = plot.months;
@@ -239,36 +285,8 @@ function bindTooltip(card, tip, svg, plot, xOf, bandW, rows) {
       band.style.opacity = 0.05;
       svg.querySelectorAll(".mark").forEach(mk =>
         mk.classList.toggle("lift", mk.dataset.i === String(i)));
-      const info = rows(i);
-      tip.replaceChildren();
-      const t = document.createElement("div");
-      t.className = "tt-title";
-      t.textContent = info.title;
-      tip.appendChild(t);
-      for (const it of info.items) {
-        const row = document.createElement("div");
-        row.className = "tt-row";
-        const key = document.createElement("span");
-        key.className = "tt-key";
-        key.style.background = it.color;
-        const val = document.createElement("span");
-        val.className = "tt-val";
-        val.textContent = it.value;
-        const name = document.createElement("span");
-        name.className = "tt-name";
-        name.textContent = it.name;
-        row.append(key, val, name);
-        tip.appendChild(row);
-      }
-      tip.style.display = "block";
-      const cr = card.getBoundingClientRect();
-      const tw = tip.offsetWidth, th = tip.offsetHeight;
-      let left = clientX - cr.left + 14;
-      if (left + tw > cr.width - 8) left = clientX - cr.left - tw - 14;
-      let top = clientY - cr.top - th - 10;
-      if (top < 4) top = clientY - cr.top + 14;
-      tip.style.left = left + "px";
-      tip.style.top = top + "px";
+      fillTip(tip, rows(i));
+      placeTip(card, tip, clientX, clientY);
     };
     hit.addEventListener("pointermove", e => show(e.clientX, e.clientY));
     hit.addEventListener("focus", () => {
@@ -421,10 +439,11 @@ function renderCategories(d) {
       const yBot = f.yOf(acc);
       const h = yBot - yTop;
       if (h > 0.5) {
+        const dim = state.catFocus && state.catFocus !== c;
         el("path", {
           d: isTopSeg ? roundedBar(xOf(i) - barW / 2, yTop, barW, h, true)
                       : `M${xOf(i) - barW / 2},${yTop} h${barW} v${h} h${-barW} Z`,
-          fill: CAT_COLORS[ci % 8], class: "mark", "data-i": i
+          fill: dim ? "var(--dim)" : CAT_COLORS[ci % 8], class: "mark", "data-i": i
         }, f.svg);
       }
       acc += v;
@@ -432,7 +451,8 @@ function renderCategories(d) {
   });
   drawMonthAxis(f, d.months, xOf);
 
-  legend("legend-cat", cats.map((c, ci) => [c, CAT_COLORS[ci % 8]]));
+  legend("legend-cat", cats.map((c, ci) => [c, CAT_COLORS[ci % 8]]),
+    name => { state.catFocus = state.catFocus === name ? null : name; renderAll(); });
   bindTooltip(card, document.getElementById("tt-cat"), f.svg,
     { months: d.months, top: f.M.top, h: f.plotH }, xOf, band, i => ({
       title: jpMonth(d.months[i]) + " 支出 " + yen(totals[i]),
@@ -440,6 +460,82 @@ function renderCategories(d) {
         color: CAT_COLORS[ci % 8], value: yen(d.cats[c][i]), name: c
       })).filter(it => it.value !== "¥0"),
     }));
+}
+
+// ---------- 4. カテゴリ別支出の合計(横棒) ----------
+// 右端(データ側)だけ 4px 丸めた横棒
+function roundedBarH(x, y, w, h) {
+  const r = Math.min(4, h / 2, w);
+  return `M${x},${y} L${x + w - r},${y} Q${x + w},${y} ${x + w},${y + r} ` +
+         `L${x + w},${y + h - r} Q${x + w},${y + h} ${x + w - r},${y + h} L${x},${y + h} Z`;
+}
+function renderCatBar(d) {
+  const container = document.getElementById("chart-catbar");
+  const card = container.closest(".card");
+  const tip = document.getElementById("tt-catbar");
+  document.getElementById("catbar-period").textContent =
+    `${jpMonth(d.months[0])} 〜 ${jpMonth(d.months[d.months.length - 1])} の合計(構成比つき)`;
+
+  const cats = DATA.categories;
+  const totals = cats.map(c => d.cats[c].reduce((a, b) => a + b, 0));
+  const order = cats.map((_, i) => i).filter(i => totals[i] > 0)
+    .sort((a, b) => totals[b] - totals[a]);
+  const grand = totals.reduce((a, b) => a + b, 0) || 1;
+  const maxV = Math.max(...order.map(i => totals[i]), 1);
+
+  const W = Math.max(320, container.clientWidth);
+  const rowH = 30, barH = 18;
+  const M = { top: 4, right: 8, bottom: 4, left: Math.min(140, W * 0.22) };
+  const valueW = 130; // 右側の値ラベル用の余白
+  const H = M.top + rowH * order.length + M.bottom;
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, width: W, height: H });
+  container.replaceChildren(svg);
+  const plotW = Math.max(40, W - M.left - M.right - valueW);
+
+  order.forEach((ci, r) => {
+    const c = cats[ci];
+    const y = M.top + rowH * r;
+    const w = Math.max(2, plotW * totals[ci] / maxV);
+    const share = Math.round(1000 * totals[ci] / grand) / 10;
+    const dim = state.catFocus && state.catFocus !== c;
+
+    const name = el("text", { x: M.left - 8, y: y + rowH / 2 + 4, "text-anchor": "end" }, svg);
+    name.textContent = c;
+    el("path", {
+      d: roundedBarH(M.left, y + (rowH - barH) / 2, w, barH),
+      fill: dim ? "var(--dim)" : CAT_COLORS[ci % 8], class: "mark", "data-i": r
+    }, svg);
+    el("text", { x: M.left + w + 8, y: y + rowH / 2 + 4, class: "dlabel" }, svg)
+      .textContent = `${yen(totals[ci])}(${share}%)`;
+
+    const hit = el("rect", {
+      x: 0, y, width: W, height: rowH, fill: "transparent", tabindex: 0
+    }, svg);
+    const show = (clientX, clientY) => {
+      svg.querySelectorAll(".mark").forEach(mk =>
+        mk.classList.toggle("lift", mk.dataset.i === String(r)));
+      fillTip(tip, {
+        title: c,
+        items: [
+          { color: CAT_COLORS[ci % 8], value: yen(totals[ci]), name: "合計" },
+          { color: "var(--text-muted)", value: share + "%", name: "支出全体に占める割合" },
+          { color: "var(--text-muted)", value: yen(totals[ci] / d.months.length), name: "月平均" },
+        ],
+      });
+      placeTip(card, tip, clientX, clientY);
+    };
+    hit.addEventListener("pointermove", e => show(e.clientX, e.clientY));
+    hit.addEventListener("focus", () => {
+      const b = hit.getBoundingClientRect();
+      show(b.left + b.width / 2, b.top);
+    });
+    const hide = () => {
+      tip.style.display = "none";
+      svg.querySelectorAll(".mark").forEach(mk => mk.classList.remove("lift"));
+    };
+    hit.addEventListener("pointerleave", hide);
+    hit.addEventListener("blur", hide);
+  });
 }
 
 // ---------- KPI タイル ----------
@@ -497,7 +593,7 @@ function renderKpis(d) {
 }
 
 // ---------- 凡例・表・フィルタ ----------
-function legend(id, entries) {
+function legend(id, entries, onClick) {
   const box = document.getElementById(id);
   box.replaceChildren();
   for (const [name, color] of entries) {
@@ -509,6 +605,17 @@ function legend(id, entries) {
     const tx = document.createElement("span");
     tx.textContent = name;
     it.append(sw, tx);
+    if (onClick) {
+      it.classList.add("clickable");
+      if (state.catFocus && state.catFocus !== name) it.classList.add("dimmed");
+      it.setAttribute("role", "button");
+      it.setAttribute("tabindex", "0");
+      it.setAttribute("aria-pressed", String(state.catFocus === name));
+      it.addEventListener("click", () => onClick(name));
+      it.addEventListener("keydown", e => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(name); }
+      });
+    }
     box.appendChild(it);
   }
 }
@@ -559,6 +666,7 @@ function renderAll() {
   renderFlow(d);
   renderNet(d);
   renderCategories(d);
+  renderCatBar(d);
   renderTable(d);
 }
 
