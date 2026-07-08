@@ -69,7 +69,16 @@ def load_postgres(dsn: str, query: str) -> list[tuple[str, int, str, str]]:
         except ImportError:
             sys.exit("エラー: PostgreSQL 接続には psycopg が必要です。\n"
                      "  pip install 'psycopg[binary]'   (または pip install psycopg2-binary)")
-    conn = psycopg.connect(dsn)
+    try:
+        conn = psycopg.connect(dsn)
+    except Exception as e:  # psycopg2/3 で例外クラスが異なるため広めに捕捉
+        sys.exit(
+            "エラー: PostgreSQL に接続できませんでした。\n"
+            "  よくある原因:\n"
+            "   - データベースが起動していない → docker-compose up -d を実行してから再試行\n"
+            "   - 接続先(ユーザー名・パスワード・DB名)が違う → --dsn の値を確認\n"
+            f"  詳細: {e}"
+        )
     try:
         cur = conn.cursor()
         cur.execute(query)
