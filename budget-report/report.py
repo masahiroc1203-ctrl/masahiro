@@ -148,11 +148,20 @@ def main() -> None:
     parser.add_argument("--table", default="transactions", help="読み取るテーブル名(デフォルトスキーマ用)")
     parser.add_argument("--query", default=None,
                         help="date/amount/type/category を返すカスタム SQL(自前スキーマ用)")
+    parser.add_argument("--query-file", type=Path, default=None,
+                        help="カスタム SQL を書いたファイルのパス(--query の代わりに使える)")
     parser.add_argument("--months", type=int, default=0,
                         help="直近 N ヶ月に限定(0 = 全期間。レポート内でも期間は絞り込み可能)")
     args = parser.parse_args()
 
-    query = args.query or f'SELECT date, amount, type, category FROM "{args.table}"'
+    if args.query and args.query_file:
+        sys.exit("エラー: --query と --query-file は同時に指定できません")
+    if args.query_file:
+        if not args.query_file.exists():
+            sys.exit(f"エラー: SQL ファイルが見つかりません: {args.query_file}")
+        query = args.query_file.read_text(encoding="utf-8")
+    else:
+        query = args.query or f'SELECT date, amount, type, category FROM "{args.table}"'
     if args.csv:
         if not args.csv.exists():
             sys.exit(f"エラー: CSV が見つかりません: {args.csv}")
