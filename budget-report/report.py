@@ -30,29 +30,62 @@ INCOME_TYPES = {"income", "収入", "in", "credit"}
 MAX_CATEGORIES = 7  # これを超えるカテゴリは「その他」に集約(カラーパレットは8色)
 
 
-def load_rows(db: Path, query: str) -> list[tuple[str, int, str, str]]:
+def normalize(records, cols: list[str]) -> list[tuple[str, int, str, str]]:
+    """(date, amount, type, category) を含む行の並びを内部形式に正規化する。"""
+    cols = [c.lower() for c in cols]
+    required = {"date", "amount", "type", "category"}
+    missing = required - set(cols)
+    if missing:
+        sys.exit(f"エラー: 入力に列 {sorted(missing)} がありません(取得列: {cols})")
+    idx = {c: cols.index(c) for c in required}
+    rows = []
+    for r in records:
+        raw_date = str(r[idx["date"]])
+        month = raw_date[:7]  # ISO 形式 (YYYY-MM-DD...) の先頭7文字
+        if len(month) != 7 or month[4] != "-":
+            sys.exit(f"エラー: date 列が ISO 形式 (YYYY-MM-DD) ではありません: {raw_date!r}")
+        amount = int(round(float(r[idx["amount"]])))
+        kind = "income" if str(r[idx["type"]]).lower() in INCOME_TYPES else "expense"
+        category = str(r[idx["category"]] or "未分類")
+        rows.append((month, abs(amount), kind, category))
+    return rows
+
+
+def load_sqlite(db: Path, query: str) -> list[tuple[str, int, str, str]]:
     conn = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
     try:
         cur = conn.execute(query)
-        cols = [c[0].lower() for c in cur.description]
-        required = {"date", "amount", "type", "category"}
-        missing = required - set(cols)
-        if missing:
-            sys.exit(f"エラー: クエリ結果に列 {sorted(missing)} がありません(取得列: {cols})")
-        idx = {c: cols.index(c) for c in required}
-        rows = []
-        for r in cur.fetchall():
-            raw_date = str(r[idx["date"]])
-            month = raw_date[:7]  # ISO 形式 (YYYY-MM-DD...) の先頭7文字
-            if len(month) != 7 or month[4] != "-":
-                sys.exit(f"エラー: date 列が ISO 形式 (YYYY-MM-DD) ではありません: {raw_date!r}")
-            amount = int(r[idx["amount"]])
-            kind = "income" if str(r[idx["type"]]).lower() in INCOME_TYPES else "expense"
-            category = str(r[idx["category"]] or "未分類")
-            rows.append((month, abs(amount), kind, category))
-        return rows
+        return normalize(cur.fetchall(), [c[0] for c in cur.description])
     finally:
         conn.close()
+
+
+def load_postgres(dsn: str, query: str) -> list[tuple[str, int, str, str]]:
+    try:
+        import psycopg  # psycopg 3
+    except ImportError:
+        try:
+            import psycopg2 as psycopg  # type: ignore[no-redef]
+        except ImportError:
+            sys.exit("エラー: PostgreSQL 接続には psycopg が必要です。\n"
+                     "  pip install 'psycopg[binary]'   (または pip install psycopg2-binary)")
+    conn = psycopg.connect(dsn)
+    try:
+        cur = conn.cursor()
+        cur.execute(query)
+        return normalize(cur.fetchall(), [c[0] for c in cur.description])
+    finally:
+        conn.close()
+
+
+def load_csv(path: Path) -> list[tuple[str, int, str, str]]:
+    import csv
+    with open(path, newline="", encoding="utf-8-sig") as f:
+        reader = csv.reader(f)
+        header = next(reader, None)
+        if header is None:
+            sys.exit(f"エラー: CSV が空です: {path}")
+        return normalize(list(reader), header)
 
 
 def month_range(start: str, end: str) -> list[str]:
@@ -106,7 +139,11 @@ def aggregate(rows: list[tuple[str, int, str, str]], limit_months: int) -> dict:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="月次収支レポート(HTML)を生成")
-    parser.add_argument("--db", required=True, type=Path, help="SQLite データベースのパス")
+    src = parser.add_mutually_exclusive_group(required=True)
+    src.add_argument("--db", type=Path, help="SQLite データベースのパス")
+    src.add_argument("--dsn", help="PostgreSQL 接続文字列(例: postgresql://user:pass@localhost:5432/kakeibo)")
+    src.add_argument("--csv", type=Path,
+                     help="date/amount/type/category 列を持つ CSV ファイルのパス")
     parser.add_argument("--out", type=Path, default=Path("report.html"), help="出力 HTML のパス")
     parser.add_argument("--table", default="transactions", help="読み取るテーブル名(デフォルトスキーマ用)")
     parser.add_argument("--query", default=None,
@@ -115,11 +152,17 @@ def main() -> None:
                         help="直近 N ヶ月に限定(0 = 全期間。レポート内でも期間は絞り込み可能)")
     args = parser.parse_args()
 
-    if not args.db.exists():
-        sys.exit(f"エラー: データベースが見つかりません: {args.db}")
-
     query = args.query or f'SELECT date, amount, type, category FROM "{args.table}"'
-    rows = load_rows(args.db, query)
+    if args.csv:
+        if not args.csv.exists():
+            sys.exit(f"エラー: CSV が見つかりません: {args.csv}")
+        rows = load_csv(args.csv)
+    elif args.dsn:
+        rows = load_postgres(args.dsn, query)
+    else:
+        if not args.db.exists():
+            sys.exit(f"エラー: データベースが見つかりません: {args.db}")
+        rows = load_sqlite(args.db, query)
     if not rows:
         sys.exit("エラー: トランザクションが1件もありません")
 

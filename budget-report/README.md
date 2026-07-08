@@ -1,9 +1,10 @@
 # budget-report — 月次収支レポート生成ツール
 
-SQLite の家計簿データベースから毎月の収支を集計し、ブラウザで開くだけで見られる
-自己完結型の HTML レポート(チャート付き)を生成するツールです。
+家計簿データベース(SQLite / PostgreSQL / CSV)から毎月の収支を集計し、
+ブラウザで開くだけで見られる自己完結型の HTML レポート(チャート付き)を
+生成するツールです。
 
-- 依存ライブラリなし(Python 3.9+ の標準ライブラリのみ)
+- 依存ライブラリなし(Python 3.9+ の標準ライブラリのみ。PostgreSQL 接続時のみ psycopg が必要)
 - 出力 HTML も外部読み込みなしの1ファイル。オフラインで開けます
 - ダークモード対応・ホバーで各月の詳細をツールチップ表示
 
@@ -68,15 +69,59 @@ python3 report.py --db mydata.db --out report.html --query "
 
 複数テーブルに分かれている場合も `UNION ALL` で結合すれば OK です。
 
+## 実データ(PostgreSQL)を参照する
+
+ローカルの PostgreSQL(`sql/01_schema.sql` のスキーマ)を直接参照できます。
+データのあるマシン上で実行してください:
+
+```bash
+pip install 'psycopg[binary]'   # 初回のみ
+
+python3 report.py \
+  --dsn postgresql://ユーザー名:パスワード@localhost:5432/データベース名 \
+  --query "$(cat queries/postgres-local-db.sql)" \
+  --out report.html
+```
+
+`queries/postgres-local-db.sql` が transactions + categories を
+このツールの形式に変換します。このスキーマには収入/支出の区分列がないため、
+**金額がマイナスの行を収入**とみなしています。収入の記録方法が違う場合は
+クエリ内の CASE 式を調整してください。
+
+### CSV 経由で参照する(リモートセッションにデータを渡す場合)
+
+Claude Code のクラウドセッションなど、DB に直接つなげない環境で集計したい
+場合は、CSV にエクスポートしてリポジトリに含めるのが簡単です:
+
+```bash
+psql -d データベース名 -c "\copy (
+  SELECT t.occurred_at::date AS date,
+         ABS(t.amount) AS amount,
+         CASE WHEN t.amount < 0 THEN 'income' ELSE 'expense' END AS type,
+         COALESCE(c.name, '未分類') AS category
+  FROM transactions t
+  LEFT JOIN categories c ON c.id = t.category_id
+) TO 'transactions.csv' WITH CSV HEADER"
+
+python3 report.py --csv transactions.csv --out report.html
+```
+
+家計データを含む CSV をコミットする場合は、リポジトリが非公開であることを
+確認してください。
+
 ### オプション一覧
 
 | オプション | 説明 | デフォルト |
 |---|---|---|
-| `--db` | SQLite データベースのパス(必須) | — |
+| `--db` | SQLite データベースのパス | — |
+| `--dsn` | PostgreSQL 接続文字列 | — |
+| `--csv` | CSV ファイルのパス(date/amount/type/category 列) | — |
 | `--out` | 出力 HTML のパス | `report.html` |
 | `--table` | 読み取るテーブル名 | `transactions` |
 | `--query` | カスタム SQL(`--table` より優先) | — |
 | `--months` | 直近 N ヶ月に限定(0 = 全期間) | `0` |
+
+`--db` / `--dsn` / `--csv` はいずれか1つを指定します。
 
 ## 定期的に更新する
 
@@ -92,7 +137,9 @@ cron 等で回せば常に最新のレポートが手元に置けます:
 budget-report/
 ├── report.py        # 集計 + HTML 生成(CLI 本体)
 ├── template.html    # レポートのテンプレート(チャート描画ロジック込み)
-├── schema.sql       # デフォルトスキーマ
+├── schema.sql       # デフォルトスキーマ(SQLite)
+├── queries/
+│   └── postgres-local-db.sql  # ローカル PostgreSQL 用アダプタクエリ
 ├── sample_data.py   # サンプル DB 生成スクリプト
 └── README.md
 ```

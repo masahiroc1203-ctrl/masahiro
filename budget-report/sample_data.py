@@ -61,6 +61,9 @@ def main() -> None:
 
         month = (month.replace(day=28) + timedelta(days=5)).replace(day=1)
 
+    # 未来日付の取引は作らない(当月は「月の途中まで」の自然な状態にする)
+    rows = [r for r in rows if r[0] <= today.isoformat()]
+
     conn.executemany(
         "INSERT INTO transactions (date, amount, type, category, memo) VALUES (?, ?, ?, ?, ?)",
         rows,
