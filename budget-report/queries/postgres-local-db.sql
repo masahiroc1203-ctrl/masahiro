@@ -1,18 +1,23 @@
--- ローカル PostgreSQL DB(sql/01_schema.sql のスキーマ)用のアダプタクエリ。
--- transactions + categories を report.py の期待する4列に変換します。
+-- ローカル PostgreSQL DB(expense / コンテナ expense-db)用のアダプタクエリ。
+-- transactions + categories を report.py が期待する4列
+-- (date / amount / type / category)に変換します。
 --
 -- 使い方:
---   python3 report.py --dsn postgresql://user:pass@localhost:5432/kakeibo \
---       --query "$(cat queries/postgres-local-db.sql)"
+--   python report.py --dsn postgresql://postgres:secret@localhost:5432/expense \
+--       --query-file queries/postgres-local-db.sql --out report.html
 --
--- 注意: このスキーマには収入/支出の区分列がないため、
--- 「金額がマイナス = 収入」とみなしています。
--- 収入を別の方法(専用カテゴリなど)で記録している場合は CASE 式を調整してください。
+-- スキーマ対応メモ(実 DB を確認して作成):
+--   - 日付列は used_on(occurred_at ではない)
+--   - 金額 amount は常に正の整数。収入/支出は direction 列で区別する
+--       direction = 'in'       … 収入
+--       direction = 'out'      … 支出
+--       direction = 'transfer' … 口座間振替(収支ではないため集計から除外)
+--   - currency 列は存在しない
 SELECT
-    t.occurred_at::date                                      AS date,
-    ABS(t.amount)                                            AS amount,
-    CASE WHEN t.amount < 0 THEN 'income' ELSE 'expense' END  AS type,
-    COALESCE(c.name, '未分類')                               AS category
+    t.used_on                                                     AS date,
+    t.amount                                                      AS amount,
+    CASE WHEN t.direction = 'in' THEN 'income' ELSE 'expense' END AS type,
+    COALESCE(c.name, '未分類')                                    AS category
 FROM transactions t
 LEFT JOIN categories c ON c.id = t.category_id
-WHERE t.currency = 'JPY'
+WHERE t.direction IN ('in', 'out')

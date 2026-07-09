@@ -27,7 +27,6 @@ from datetime import datetime
 from pathlib import Path
 
 INCOME_TYPES = {"income", "収入", "in", "credit"}
-MAX_CATEGORIES = 7  # これを超えるカテゴリは「その他」に集約(カラーパレットは8色)
 
 
 def normalize(records, cols: list[str]) -> list[tuple[str, int, str, str]]:
@@ -126,15 +125,9 @@ def aggregate(rows: list[tuple[str, int, str, str]], limit_months: int) -> dict:
         months = months[-limit_months:]
 
     cat_totals = {c: sum(by_category[c].get(mo, 0) for mo in months) for c in by_category}
-    ranked = sorted((c for c in cat_totals if cat_totals[c] > 0), key=lambda c: -cat_totals[c])
-    top, tail = ranked[:MAX_CATEGORIES], ranked[MAX_CATEGORIES:]
-    categories = top + (["その他"] if tail else [])
-
-    category_series = {}
-    for c in top:
-        category_series[c] = [by_category[c].get(mo, 0) for mo in months]
-    if tail:
-        category_series["その他"] = [sum(by_category[c].get(mo, 0) for c in tail) for mo in months]
+    # 全カテゴリを金額の多い順に返す(集約せず、絞り込みはレポート側の凡例クリックで行う)
+    categories = sorted((c for c in cat_totals if cat_totals[c] > 0), key=lambda c: -cat_totals[c])
+    category_series = {c: [by_category[c].get(mo, 0) for mo in months] for c in categories}
 
     return {
         "months": months,

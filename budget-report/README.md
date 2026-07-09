@@ -78,15 +78,16 @@ python3 report.py --db mydata.db --out report.html --query "
 pip install 'psycopg[binary]'   # 初回のみ
 
 python3 report.py \
-  --dsn postgresql://ユーザー名:パスワード@localhost:5432/データベース名 \
-  --query "$(cat queries/postgres-local-db.sql)" \
+  --dsn postgresql://postgres:secret@localhost:5432/expense \
+  --query-file queries/postgres-local-db.sql \
   --out report.html
 ```
 
 `queries/postgres-local-db.sql` が transactions + categories を
-このツールの形式に変換します。このスキーマには収入/支出の区分列がないため、
-**金額がマイナスの行を収入**とみなしています。収入の記録方法が違う場合は
-クエリ内の CASE 式を調整してください。
+このツールの形式に変換します。このスキーマでは `direction` 列で収入/支出を
+区別します(`in` = 収入、`out` = 支出、`transfer` = 口座間振替は集計から除外)。
+金額 `amount` は常に正の整数です。収入の記録方法が違う場合は
+クエリ内の CASE 式や WHERE 句を調整してください。
 
 **Windows の場合**は同梱の `レポート作成.bat` をダブルクリックするだけで、
 レポートの生成からブラウザ表示まで自動で行われます(接続先を変えたい場合は
@@ -98,13 +99,14 @@ Claude Code のクラウドセッションなど、DB に直接つなげない�
 場合は、CSV にエクスポートしてリポジトリに含めるのが簡単です:
 
 ```bash
-psql -d データベース名 -c "\copy (
-  SELECT t.occurred_at::date AS date,
-         ABS(t.amount) AS amount,
-         CASE WHEN t.amount < 0 THEN 'income' ELSE 'expense' END AS type,
+psql -d expense -c "\copy (
+  SELECT t.used_on AS date,
+         t.amount AS amount,
+         CASE WHEN t.direction = 'in' THEN 'income' ELSE 'expense' END AS type,
          COALESCE(c.name, '未分類') AS category
   FROM transactions t
   LEFT JOIN categories c ON c.id = t.category_id
+  WHERE t.direction IN ('in', 'out')
 ) TO 'transactions.csv' WITH CSV HEADER"
 
 python3 report.py --csv transactions.csv --out report.html
