@@ -67,7 +67,9 @@ def convert() -> pd.DataFrame:
 
     if not frames:
         return pd.DataFrame(columns=["datetime", "room", "kwh"])
-    return pd.concat(frames).sort_values(["datetime", "room"]).reset_index(drop=True)
+    result = pd.concat(frames).sort_values(["datetime", "room"]).reset_index(drop=True)
+    result["kwh"] = result["kwh"].round(3)
+    return result
 
 
 def main() -> None:
