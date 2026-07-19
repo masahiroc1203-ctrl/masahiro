@@ -1,7 +1,9 @@
 """HEMS生ログ（積算カウンタ）を electricity_hourly.csv（datetime, room, kwh）に変換する。
 
 各チャンネルの積算カウンタを毎時0分の値に線形補間し、前後の差分から時間別kWhを求める。
-マスタと6ch合計の差は「Other」（計測外回路）として出力するため、部屋別合計＝家全体になる。
+家全体消費 = 買電(master) − 売電(export) + 太陽光発電(pv) で復元し、6ch合計との差を
+「Other」（計測外回路）として出力するため、部屋別合計≒家全体になる。
+※ エネファーム発電の自家消費分は計測外のため、家全体・Otherはその分過小評価になる。
 
 使い方: python hems_to_hourly.py  （data/hems_raw.csv 蓄積後に実行）
 """
@@ -55,9 +57,12 @@ def convert() -> pd.DataFrame:
         frames.append(pd.DataFrame({"datetime": kwh.index, "room": room, "kwh": kwh.to_numpy()}))
         channel_sums = kwh if channel_sums is None else channel_sums.add(kwh, fill_value=0)
 
-    master = hourly_kwh(raw, "master")
-    if not master.empty and channel_sums is not None:
-        other = (master - channel_sums.reindex(master.index).fillna(0)).clip(lower=0)
+    imported = hourly_kwh(raw, "master")
+    if not imported.empty and channel_sums is not None:
+        exported = hourly_kwh(raw, "export").reindex(imported.index).fillna(0)
+        pv = hourly_kwh(raw, "pv").reindex(imported.index).fillna(0)
+        total = imported - exported + pv  # エネファーム自家消費分は取得できず含まれない
+        other = (total - channel_sums.reindex(total.index).fillna(0)).clip(lower=0)
         frames.append(pd.DataFrame({"datetime": other.index, "room": HEMS_OTHER_ROOM, "kwh": other.to_numpy()}))
 
     if not frames:

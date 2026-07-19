@@ -22,12 +22,14 @@ from echonet import get_props, open_socket
 EOJ_DBOARD = b"\x02\x87\x01"  # 分電盤メータリング
 EOJ_PV = b"\x02\x79\x01"  # 住宅用太陽光発電
 
-EPC_MASTER_CUMULATIVE = 0xC0  # マスタ積算電力量（正方向）
+# マスタCTは主幹＝系統との潮流を測る。0xC0は買電のみ増え、余剰売電中は停止する（実測確認）
+EPC_MASTER_CUMULATIVE = 0xC0  # マスタ積算電力量（正方向＝買電）
+EPC_EXPORT_CUMULATIVE = 0xC1  # マスタ積算電力量（逆方向＝売電）
 EPC_CHANNEL_CUMULATIVE_LIST = 0xB3  # 回路別積算電力量リスト
 EPC_PV_CUMULATIVE = 0xE1  # 太陽光積算発電電力量
 
 CHANNEL_COUNT = 6
-CSV_HEADER = ["timestamp", "master", "ch1", "ch2", "ch3", "ch4", "ch5", "ch6", "pv"]
+CSV_HEADER = ["timestamp", "master", "export", "ch1", "ch2", "ch3", "ch4", "ch5", "ch6", "pv"]
 RETRY_COUNT = 3
 
 
@@ -50,7 +52,11 @@ def read_counters(tid: int) -> dict[str, int | None] | None:
     sock = open_socket()
     try:
         props = get_props(
-            sock, HEMS_METER_IP, EOJ_DBOARD, [EPC_MASTER_CUMULATIVE, EPC_CHANNEL_CUMULATIVE_LIST], tid
+            sock,
+            HEMS_METER_IP,
+            EOJ_DBOARD,
+            [EPC_MASTER_CUMULATIVE, EPC_EXPORT_CUMULATIVE, EPC_CHANNEL_CUMULATIVE_LIST],
+            tid,
         )
         if not props:
             return None
@@ -61,6 +67,8 @@ def read_counters(tid: int) -> dict[str, int | None] | None:
     row: dict[str, int | None] = {}
     master_edt = props.get(EPC_MASTER_CUMULATIVE, b"")
     row["master"] = struct.unpack(">I", master_edt)[0] if len(master_edt) == 4 else None
+    export_edt = props.get(EPC_EXPORT_CUMULATIVE, b"")
+    row["export"] = struct.unpack(">I", export_edt)[0] if len(export_edt) == 4 else None
 
     channels = parse_channel_list(props.get(EPC_CHANNEL_CUMULATIVE_LIST, b""))
     for i in range(CHANNEL_COUNT):
@@ -91,7 +99,10 @@ def append_sample(tid: int) -> bool:
             writer.writerow(CSV_HEADER)
         timestamp = datetime.now().isoformat(timespec="seconds")
         writer.writerow([timestamp] + [row[k] if row[k] is not None else "" for k in CSV_HEADER[1:]])
-    print(f"{timestamp} 記録: master={row['master']} ch={[row[f'ch{i + 1}'] for i in range(CHANNEL_COUNT)]} pv={row['pv']}")
+    print(
+        f"{timestamp} 記録: 買電={row['master']} 売電={row['export']} "
+        f"ch={[row[f'ch{i + 1}'] for i in range(CHANNEL_COUNT)]} pv={row['pv']}"
+    )
     return True
 
 

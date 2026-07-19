@@ -113,7 +113,8 @@
 
 - `home_energy/echonet.py` — ECHONET Lite共通ユーティリティ（ポート3610バインド等）
 - `home_energy/poll_hems.py` — 積算カウンタを `data/hems_raw.csv` に追記（1回実行 or `--interval 300` 常駐）
-- `home_energy/hems_to_hourly.py` — 生ログを毎時0分に線形補間して差分→ `electricity_hourly.csv`（マスタ−6chは "Other" 行として出力するので部屋別合計＝家全体）
+- `home_energy/hems_to_hourly.py` — 生ログを毎時0分に線形補間して差分→ `electricity_hourly.csv`（家全体−6chは "Other" 行として出力）
+- **マスタCTの意味（実測で確認）**: 0xC0=買電積算・0xC1=売電積算（主幹CTは系統潮流。余剰売電中は0xC0が停止する）。家全体消費 = 買電 − 売電 + 太陽光発電 + エネファーム発電。エネファーム分は取得手段がなく、家全体・Otherはその分**過小評価**になる（発電中最大約0.7kW）。エネファームのLAN接続（ECHONET対応なら燃料電池クラスで発電量取得可）を検討中
 - 推奨運用: タスクスケジューラで poll_hems.py を5〜10分間隔実行 → 日次で hems_to_hourly.py → git push
 
 ### 未解決事項
