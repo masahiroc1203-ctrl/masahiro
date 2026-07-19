@@ -9,6 +9,7 @@ OUTPUT_DIR = PROJECT_ROOT / "output"
 
 TEMPERATURE_CSV = DATA_DIR / "temperature.csv"
 ELECTRICITY_CSV = DATA_DIR / "electricity.csv"
+ELECTRICITY_HOURLY_CSV = DATA_DIR / "electricity_hourly.csv"  # HEMS回路別（あれば優先）
 GAS_CSV = DATA_DIR / "gas.csv"
 
 REPORT_MD = OUTPUT_DIR / "report.md"

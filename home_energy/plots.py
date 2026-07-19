@@ -12,7 +12,7 @@ import pandas as pd
 from config import CDD_BASE_C, HDD_BASE_C, OUTPUT_DIR
 
 if TYPE_CHECKING:
-    from analyze import Regression
+    from regression import Regression
 
 FIG_DPI = 120
 
@@ -85,4 +85,37 @@ def plot_gas_vs_hdd(merged: pd.DataFrame, reg: "Regression | None") -> None:
     ax.grid(alpha=0.3)
     fig.tight_layout()
     fig.savefig(OUTPUT_DIR / "gas_vs_hdd.png", dpi=FIG_DPI)
+    plt.close(fig)
+
+
+def plot_room_shares(rooms: dict) -> None:
+    """部屋別の年間電力量を横棒グラフで示す。"""
+    shares = rooms["shares"].sort_values()
+    fig, ax = plt.subplots(figsize=(8, 5))
+    ax.barh(shares.index, shares.values, color="tab:cyan")
+    for i, kwh in enumerate(shares.values):
+        ax.text(kwh, i, f" {kwh:,.0f} kWh ({kwh / rooms['total_kwh']:.0%})", va="center", fontsize=9)
+    ax.set_xlabel("Annual electricity (kWh)")
+    ax.set_title("Electricity by room / circuit")
+    ax.set_xlim(0, shares.max() * 1.3)  # ラベルがはみ出さない余白
+    ax.grid(alpha=0.3, axis="x")
+    fig.tight_layout()
+    fig.savefig(OUTPUT_DIR / "room_shares.png", dpi=FIG_DPI)
+    plt.close(fig)
+
+
+def plot_room_profile(rooms: dict) -> None:
+    """部屋別の平均時間帯プロファイル（kWh/時）を折れ線で示す。"""
+    profile: pd.DataFrame = rooms["profile"]
+    fig, ax = plt.subplots(figsize=(10, 5))
+    for room in profile.columns:
+        ax.plot(profile.index, profile[room], marker="o", ms=3, lw=1.2, label=room)
+    ax.set_xlabel("Hour of day")
+    ax.set_ylabel("Avg electricity (kWh/h)")
+    ax.set_title("Average hourly profile by room")
+    ax.set_xticks(range(0, 24, 2))
+    ax.legend(fontsize=8)
+    ax.grid(alpha=0.3)
+    fig.tight_layout()
+    fig.savefig(OUTPUT_DIR / "room_profile.png", dpi=FIG_DPI)
     plt.close(fig)

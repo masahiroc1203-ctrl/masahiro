@@ -8,7 +8,14 @@
 import numpy as np
 import pandas as pd
 
-from config import DATA_DIR, ELECTRICITY_CSV, GAS_CSV, HDD_BASE_C, TEMPERATURE_CSV
+from config import (
+    DATA_DIR,
+    ELECTRICITY_CSV,
+    ELECTRICITY_HOURLY_CSV,
+    GAS_CSV,
+    HDD_BASE_C,
+    TEMPERATURE_CSV,
+)
 
 RANDOM_SEED = 42
 N_DAYS = 366
@@ -37,6 +44,13 @@ GAS_BASE_M3 = 0.35
 GAS_HEATING_M3_PER_DEG = 0.09
 GAS_NOISE_SD = 0.08
 
+# 時間別・部屋別モデル（kWh/時）。想定の家:
+# 1F: LDK（吹き抜け・冷房効率低め・床暖房補助でたまにエアコン暖房）
+# 2F: 寝室（夜間冷房）・書斎（日中）・浴室/洗濯（朝夕）
+DIURNAL_AMPLITUDE_C = 3.0  # 外気の日内変動
+COOLING_BASE_C = 24.0
+AC_HEAT_THRESHOLD_C = 8.0  # これより寒い日はLDKでエアコン補助暖房
+
 
 def _outdoor_temperature(dates: pd.DatetimeIndex, rng: np.random.Generator) -> np.ndarray:
     """季節正弦波 + ノイズで外気温を作る。"""
@@ -58,6 +72,51 @@ def _indoor_temperature(outdoor: np.ndarray, rng: np.random.Generator) -> np.nda
         ),
     )
     return indoor + rng.normal(0, 0.5, len(outdoor))
+
+
+def _hourly_by_room(dates: pd.DatetimeIndex, outdoor: np.ndarray, rng: np.random.Generator) -> pd.DataFrame:
+    """部屋別・時間別のkWhを生成する（ロング形式）。"""
+    hours = np.arange(24)
+    diurnal = DIURNAL_AMPLITUDE_C * np.sin((hours - 8) / 24 * 2 * np.pi)  # 14時ごろ最高
+
+    frames: list[pd.DataFrame] = []
+    for i, day in enumerate(dates):
+        t_h = outdoor[i] + diurnal
+        cooling = np.clip(t_h - COOLING_BASE_C, 0, None)
+        heating = np.clip(HDD_BASE_C - t_h, 0, None)
+
+        occupied_ldk = (hours >= 7) & (hours <= 23)
+        # 吹き抜けで冷気が2Fへ逃げる分、LDKの冷房係数は他室より大きい
+        ldk = (
+            0.10 * occupied_ldk
+            + 0.09 * cooling * ((hours >= 10) & (hours <= 22))
+            + (0.04 * heating * (((hours >= 6) & (hours <= 9)) | (hours >= 17))
+               if outdoor[i] < AC_HEAT_THRESHOLD_C else 0.0)
+        )
+        night = (hours >= 21) | (hours <= 6)
+        bedroom = 0.03 * night + 0.05 * cooling * night
+        study = 0.08 * ((hours >= 9) & (hours <= 18)) + 0.05 * cooling * ((hours >= 9) & (hours <= 18))
+        bath_laundry = 0.15 * ((hours >= 18) & (hours <= 22)) + 0.05 * ((hours >= 6) & (hours <= 8))
+        other = np.full(24, 0.22)  # 冷蔵庫・ネットワーク機器等の常時負荷
+
+        for room, kwh in (
+            ("LDK", ldk),
+            ("Bedroom", bedroom),
+            ("Study", study),
+            ("Bath/Laundry", bath_laundry),
+            ("Other/Base", other),
+        ):
+            noisy = np.clip(kwh + rng.normal(0, 0.02, 24), 0, None)
+            frames.append(
+                pd.DataFrame(
+                    {
+                        "datetime": day + pd.to_timedelta(hours, unit="h"),
+                        "room": room,
+                        "kwh": noisy.round(3),
+                    }
+                )
+            )
+    return pd.concat(frames, ignore_index=True)
 
 
 def main() -> None:
@@ -110,7 +169,11 @@ def main() -> None:
     gas_monthly["month"] = gas_monthly["month"].dt.strftime("%Y-%m")
     gas_monthly.to_csv(GAS_CSV, index=False)
 
-    print(f"サンプルデータを {DATA_DIR} に生成しました（{N_DAYS}日分）")
+    hourly = _hourly_by_room(dates, outdoor, rng)
+    hourly["datetime"] = hourly["datetime"].dt.strftime("%Y-%m-%d %H:%M")
+    hourly.to_csv(ELECTRICITY_HOURLY_CSV, index=False)
+
+    print(f"サンプルデータを {DATA_DIR} に生成しました（{N_DAYS}日分・部屋別時間別を含む）")
 
 
 if __name__ == "__main__":
