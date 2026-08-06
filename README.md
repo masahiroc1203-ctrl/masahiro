@@ -40,6 +40,20 @@ python3 tools/claude_ledger.py daily --days 0
 
 必要なもの: Python 3.11+ と PyYAML (`pip install pyyaml`)。
 
+### Windows で使う場合
+
+コマンドは `python3` ではなく `python`、パス区切りは `\` になります。付属の `ledger.bat` を使うと
+どこから呼んでもリポジトリ直下に移動し、UTF-8 モード（`-X utf8`）で実行します。出力をファイルに
+リダイレクトしたときの文字化けや `UnicodeEncodeError` を避けられます。
+
+```bat
+ledger scan
+ledger all
+ledger daily --days 7
+```
+
+ログの既定の置き場所 `%USERPROFILE%\.claude\projects` はそのまま自動で読まれます。
+
 ## 日次トークン使用量
 
 `scan` はセッション単位の合計に加えて、**日付ごとの内訳**（入力 / 出力 / キャッシュ書込 / キャッシュ読込 / 推定コスト）も記録します。ダッシュボードには積み上げ棒グラフと日次テーブルが並び、`daily` サブコマンドではターミナルで同じ内容を確認できます。
