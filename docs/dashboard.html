@@ -1,0 +1,245 @@
+<title>Claude 成果物ダッシュボード</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --paper:    #f6f7f9;
+  --sheet:    #ffffff;
+  --ink:      #131b26;
+  --slate:    #5c6879;
+  --faint:    #8b97a6;
+  --rule:     #dfe3e9;
+  --rule-strong: #c3cad4;
+  --brass:    #a97514;
+  --brass-dim:#f0e2c4;
+  --active:   #2563a8;
+  --review:   #0e7c7b;
+  --todo:     #6b7684;
+  --hold:     #a14a5a;
+  --done:     #2f7a4e;
+  --archived: #929caa;
+  --m1: #a97514; --m2: #2563a8; --m3: #0e7c7b;
+  --m4: #7a4fa3; --m5: #a14a5a; --m6: #6b7684;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper:    #12161d;
+    --sheet:    #191f28;
+    --ink:      #e7ecf2;
+    --slate:    #9aa6b6;
+    --faint:    #6d7987;
+    --rule:     #2a323d;
+    --rule-strong: #3b4553;
+    --brass:    #e0a93c;
+    --brass-dim:#4a3c1e;
+    --active:   #6ba6e8;
+    --review:   #4fbdbb;
+    --todo:     #8e99a8;
+    --hold:     #d78a97;
+    --done:     #63c48e;
+    --archived: #6d7987;
+    --m1: #e0a93c; --m2: #6ba6e8; --m3: #4fbdbb;
+    --m4: #b18ad6; --m5: #d78a97; --m6: #8e99a8;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #12161d; --sheet: #191f28; --ink: #e7ecf2; --slate: #9aa6b6;
+  --faint: #6d7987; --rule: #2a323d; --rule-strong: #3b4553;
+  --brass: #e0a93c; --brass-dim: #4a3c1e;
+  --active: #6ba6e8; --review: #4fbdbb; --todo: #8e99a8;
+  --hold: #d78a97; --done: #63c48e; --archived: #6d7987;
+  --m1: #e0a93c; --m2: #6ba6e8; --m3: #4fbdbb;
+  --m4: #b18ad6; --m5: #d78a97; --m6: #8e99a8;
+}
+:root[data-theme="light"] {
+  --paper: #f6f7f9; --sheet: #ffffff; --ink: #131b26; --slate: #5c6879;
+  --faint: #8b97a6; --rule: #dfe3e9; --rule-strong: #c3cad4;
+  --brass: #a97514; --brass-dim: #f0e2c4;
+  --active: #2563a8; --review: #0e7c7b; --todo: #6b7684;
+  --hold: #a14a5a; --done: #2f7a4e; --archived: #929caa;
+  --m1: #a97514; --m2: #2563a8; --m3: #0e7c7b;
+  --m4: #7a4fa3; --m5: #a14a5a; --m6: #6b7684;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic Medium",
+               "Noto Sans JP", "Segoe UI", system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 3rem 1.5rem 5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 3.25rem;
+}
+.num, code, .mono {
+  font-family: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- ヘッダ --- */
+.masthead { display: flex; flex-direction: column; gap: .5rem; }
+.eyebrow {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: .7rem; letter-spacing: .18em; text-transform: uppercase;
+  color: var(--brass); margin: 0;
+}
+.masthead h1 {
+  margin: 0; font-size: clamp(1.9rem, 4vw, 2.6rem); font-weight: 700;
+  letter-spacing: -.02em; text-wrap: balance;
+}
+.masthead p { margin: 0; color: var(--slate); max-width: 62ch; }
+.stamp {
+  margin-top: .35rem; padding-top: .75rem; border-top: 2px solid var(--ink);
+  font-size: .8rem; color: var(--faint);
+  display: flex; flex-wrap: wrap; gap: 1.25rem;
+}
+
+/* --- KPI --- */
+.kpis {
+  display: grid; gap: 1px; background: var(--rule);
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  border: 1px solid var(--rule);
+}
+.kpi { background: var(--sheet); padding: 1.15rem 1.25rem; display: flex; flex-direction: column; gap: .3rem; }
+.kpi .label {
+  font-size: .72rem; letter-spacing: .1em; text-transform: uppercase; color: var(--faint);
+}
+.kpi .value { font-size: 1.75rem; font-weight: 600; letter-spacing: -.02em; line-height: 1.15; }
+.kpi .sub { font-size: .78rem; color: var(--slate); }
+.kpi.accent .value { color: var(--brass); }
+
+/* --- セクション --- */
+section { display: flex; flex-direction: column; gap: 1rem; }
+.section-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 1rem; flex-wrap: wrap;
+  border-bottom: 2px solid var(--ink); padding-bottom: .5rem;
+}
+.section-head h2 { margin: 0; font-size: 1.1rem; font-weight: 700; letter-spacing: .01em; }
+.section-head .meta { font-size: .8rem; color: var(--faint); }
+
+/* --- シェアバー --- */
+.sharebar {
+  display: flex; height: 12px; width: 100%; overflow: hidden;
+  border: 1px solid var(--rule-strong);
+}
+.sharebar span { display: block; height: 100%; }
+.legend { display: flex; flex-wrap: wrap; gap: .35rem 1.1rem; font-size: .8rem; color: var(--slate); }
+.legend .item { display: flex; align-items: center; gap: .4rem; }
+.swatch { width: 10px; height: 10px; flex: none; }
+
+/* --- 台帳テーブル --- */
+.sheet { overflow-x: auto; border: 1px solid var(--rule); background: var(--sheet); }
+table { width: 100%; border-collapse: collapse; font-size: .875rem; min-width: 620px; }
+thead th {
+  text-align: left; font-weight: 600; font-size: .72rem; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--faint);
+  padding: .7rem .85rem; border-bottom: 1px solid var(--rule-strong); white-space: nowrap;
+}
+tbody td { padding: .7rem .85rem; border-bottom: 1px solid var(--rule); vertical-align: top; }
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover { background: color-mix(in srgb, var(--brass) 6%, transparent); }
+.right { text-align: right; }
+.nowrap { white-space: nowrap; }
+.dim { color: var(--faint); }
+.title-cell { min-width: 18rem; }
+.title-cell .name { font-weight: 600; }
+.title-cell .desc { font-size: .8rem; color: var(--slate); }
+
+/* --- ステータス pill --- */
+.pill {
+  display: inline-block; padding: .1rem .55rem; font-size: .74rem; font-weight: 600;
+  border: 1px solid currentColor; border-radius: 999px; white-space: nowrap;
+}
+.pill.s-active { color: var(--active); }
+.pill.s-review { color: var(--review); }
+.pill.s-todo { color: var(--todo); }
+.pill.s-hold { color: var(--hold); }
+.pill.s-done { color: var(--done); }
+.pill.s-archived { color: var(--archived); }
+
+/* --- 進捗メータ --- */
+.meter { display: block; width: 100%; height: 5px; background: var(--rule); margin-top: .4rem; }
+.meter i { display: block; height: 100%; background: var(--brass); }
+
+.tagrow { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .35rem; }
+.tag {
+  font-size: .72rem; padding: .05rem .45rem; color: var(--slate);
+  background: var(--brass-dim); border-radius: 2px;
+}
+a { color: var(--brass); text-underline-offset: 2px; }
+a:focus-visible, summary:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+details summary { cursor: pointer; font-size: .8rem; color: var(--slate); }
+details[open] summary { margin-bottom: .4rem; }
+.subsessions { font-size: .8rem; color: var(--slate); display: flex; flex-direction: column; gap: .2rem; }
+.empty { padding: 1.5rem; color: var(--faint); font-size: .9rem; }
+footer { border-top: 1px solid var(--rule); padding-top: 1rem; font-size: .8rem; color: var(--faint); }
+footer p { margin: .25rem 0; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+<div class="wrap">
+<header class="masthead">
+<p class="eyebrow">Claude Work Ledger</p>
+<h1>Claude 成果物ダッシュボード</h1>
+<p>Claude Code のセッションログから使用モデル・トークン・推定コストを自動集計し、手動登録した成果物レジストリと突き合わせた台帳です。</p>
+<div class="stamp">
+<span>生成 <span class="num">2026-08-06 03:54</span></span>
+<span>ログ元 <code>/root/.claude/projects</code></span>
+</div></header>
+<div class="kpis">
+<div class="kpi"><span class="label">成果物</span><span class="value num">1</span><span class="sub">うち進行中 1 件</span></div>
+<div class="kpi"><span class="label">セッション</span><span class="value num">1</span><span class="sub">未紐付け 0 件</span></div>
+<div class="kpi"><span class="label">総トークン</span><span class="value num">3.85M</span><span class="sub">API リクエスト 15 回</span></div>
+<div class="kpi accent"><span class="label">推定コスト</span><span class="value num">$6.49</span><span class="sub">公開価格ベースの概算</span></div>
+</div>
+<section>
+<div class="section-head"><h2>モデル別内訳</h2><span class="meta">コスト構成比 / 1 モデル</span></div>
+<div class="sharebar">
+<span style="width:100.00%;background:var(--m1)" title="opus 5 $6.49"></span>
+</div>
+<div class="legend">
+<span class="item"><i class="swatch" style="background:var(--m1)"></i>opus 5 <span class="num dim">100%</span></span>
+</div>
+<div class="sheet"><table>
+<thead><tr><th>モデル</th><th class='right'>リクエスト</th><th class='right'>入力</th><th class='right'>出力</th><th class='right'>キャッシュ書込</th><th class='right'>キャッシュ読込</th><th class='right'>推定コスト</th></tr></thead><tbody>
+<tr><td class="nowrap"><i class="swatch" style="background:var(--m1);display:inline-block;margin-right:.5rem"></i><code>claude-opus-5</code></td><td class="right num">15</td><td class="right num">62</td><td class="right num">27,878</td><td class="right num">408,326</td><td class="right num">3,418,695</td><td class="right num">$6.49</td></tr>
+</tbody></table></div>
+</section>
+<section>
+<div class="section-head"><h2>成果物台帳</h2><span class="meta">deliverables.yaml で管理</span></div>
+<div class="sheet"><table>
+<thead><tr><th>成果物</th><th>進捗</th><th>使用モデル</th><th class='right'>セッション</th><th class='right'>トークン</th><th class='right'>推定コスト</th></tr></thead><tbody>
+<tr>
+<td class="title-cell">
+<div class="name"><a href="https://github.com/masahiroc1203-ctrl/masahiro">Claude 成果物管理ダッシュボード</a></div>
+<div class="desc">セッションログからモデル・トークン・コストを集計し、成果物台帳と突き合わせて HTML ダッシュボードを生成する CLI。</div>
+<div class="tagrow"><span class="tag">ツール</span><span class="tag">可視化</span></div>
+<span class="meter"><i style="width:100.0%"></i></span>
+<details><summary>セッション内訳</summary><div class='subsessions'>
+<span><code>68d1c943</code> 2026-08-06 03:47 · <span class="num">$6.49</span> · Claudeで作った成果物をまとめて管理したい</span>
+</div></details>
+</td>
+<td><span class="pill s-review">レビュー中</span></td>
+<td class="dim">opus 5</td>
+<td class="right num">1</td>
+<td class="right num">3.85M</td>
+<td class="right num">$6.49</td>
+</tr>
+</tbody></table></div>
+</section>
+<section>
+<div class="section-head"><h2>未紐付けセッション</h2><span class="meta">0 件 — 成果物に割り当てると台帳へ集計されます</span></div>
+<div class="sheet"><p class="empty">未紐付けのセッションはありません。</p></div>
+</section>
+<footer>
+<p>コストは Anthropic 公開価格に基づく概算です（キャッシュ書込 5分 = 入力単価 ×1.25 / 1時間 = ×2.0、キャッシュ読込 = ×0.1）。実際の請求額とは一致しません。</p>
+<p>再生成: <code>python3 tools/claude_ledger.py all</code></p>
+</footer>
+</div>

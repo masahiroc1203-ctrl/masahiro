@@ -1,0 +1,25 @@
+# Claude 成果物レジストリ
+#
+# 手で管理する台帳。進捗ステータスやリンクなどログに残らない情報をここに書き、
+# `sessions` に Claude Code のセッションID（前方一致OK・8桁でも可）を並べると
+# モデル・トークン・コストが自動で紐付きます。
+#
+# status: 未着手 / 進行中 / レビュー中 / 保留 / 完了 / アーカイブ
+#
+# 追加コマンド:
+#   python3 tools/claude_ledger.py add "タイトル" --status 進行中 --sessions 68d1c943
+# 集計とダッシュボード生成:
+#   python3 tools/claude_ledger.py all
+
+deliverables:
+  - id: claude-ledger
+    title: Claude 成果物管理ダッシュボード
+    status: レビュー中
+    tags:
+      - ツール
+      - 可視化
+    link: https://github.com/masahiroc1203-ctrl/masahiro
+    notes: セッションログからモデル・トークン・コストを集計し、成果物台帳と突き合わせて HTML ダッシュボードを生成する CLI。
+    updated: 2026-08-06
+    sessions:
+      - 68d1c943
