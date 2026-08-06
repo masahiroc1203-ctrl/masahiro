@@ -308,8 +308,30 @@ def load_registry() -> dict:
     return data
 
 
+# PyYAML はコメントを保持しないため、書き戻しのたびに先頭へ付け直す。
+REGISTRY_HEADER = """\
+# Claude 成果物レジストリ
+#
+# 手で管理する台帳。進捗ステータスやリンクなどログに残らない情報をここに書き、
+# `sessions` に Claude Code のセッションID（前方一致OK・8桁でも可）を並べると
+# モデル・トークン・コストが自動で紐付きます。
+#
+# status: 未着手 / 進行中 / レビュー中 / 保留 / 完了 / アーカイブ
+#
+# 主なコマンド:
+#   python3 tools/claude_ledger.py sessions              # 未紐付けセッションとIDを一覧
+#   python3 tools/claude_ledger.py link <id> <session>   # 既存の成果物に紐付け
+#   python3 tools/claude_ledger.py add "タイトル"          # 新規登録
+#   python3 tools/claude_ledger.py all                   # 集計 + ダッシュボード生成
+#
+# ※ このファイルはツールが書き戻す際に再生成されるため、
+#    ここより下に書いたコメントは保持されません。
+"""
+
+
 def save_registry(data: dict) -> None:
     with REGISTRY_PATH.open("w", encoding="utf-8") as fh:
+        fh.write(REGISTRY_HEADER)
         yaml.safe_dump(data, fh, allow_unicode=True, sort_keys=False, width=100)
 
 
@@ -441,6 +463,91 @@ def cmd_add(args) -> None:
     print(f"✓ 追加: [{entry['status']}] {entry['title']}  (id: {entry['id']})")
 
 
+def find_entry(registry: dict, key: str) -> dict:
+    """id / title の完全一致 -> 前方一致 -> 部分一致 の順で成果物を探す。"""
+    entries = registry.get("deliverables", [])
+    if not entries:
+        sys.exit("台帳が空です。先に `add` で成果物を登録してください。")
+    for match in (
+        lambda e: e.get("id") == key or e.get("title") == key,
+        lambda e: str(e.get("id", "")).startswith(key),
+        lambda e: key in str(e.get("title", "")),
+    ):
+        hits = [e for e in entries if match(e)]
+        if len(hits) == 1:
+            return hits[0]
+        if len(hits) > 1:
+            names = ", ".join(str(e.get("id")) for e in hits)
+            sys.exit(f"「{key}」に複数該当します: {names}")
+    available = "\n".join(f"  - {e.get('id')}  ({e.get('title')})" for e in entries)
+    sys.exit(f"成果物「{key}」が見つかりません。登録済み:\n{available}")
+
+
+def cmd_link(args) -> None:
+    registry = load_registry()
+    entry = find_entry(registry, args.deliverable)
+    current = list(entry.get("sessions") or [])
+
+    known = {s["session_id"] for s in load_sessions()["sessions"]}
+    added, unknown = [], []
+    for sid in args.sessions:
+        sid = sid.strip()
+        if not sid or sid in current:
+            continue
+        if not any(k == sid or k.startswith(sid) for k in known):
+            unknown.append(sid)
+        current.append(sid)
+        added.append(sid)
+
+    entry["sessions"] = current
+    entry["updated"] = datetime.now(timezone.utc).date().isoformat()
+    save_registry(registry)
+
+    print(f"✓ [{entry.get('status')}] {entry.get('title')} に {len(added)} 件紐付けました")
+    for sid in added:
+        print(f"    + {sid}")
+    if unknown:
+        print(f"  ! 現在のログに見つからないID: {', '.join(unknown)}")
+        print("    (別マシンのログの場合は、そのマシンで scan すると集計されます)")
+    print("  `python3 tools/claude_ledger.py all` で再集計してください。")
+
+
+def cmd_unlink(args) -> None:
+    registry = load_registry()
+    entry = find_entry(registry, args.deliverable)
+    before = list(entry.get("sessions") or [])
+    entry["sessions"] = [s for s in before if s not in args.sessions]
+    removed = len(before) - len(entry["sessions"])
+    entry["updated"] = datetime.now(timezone.utc).date().isoformat()
+    save_registry(registry)
+    print(f"✓ {entry.get('title')} から {removed} 件の紐付けを外しました")
+
+
+def cmd_sessions(args) -> None:
+    data = load_sessions()
+    registry = load_registry()
+    items, orphans = link_sessions(registry, data["sessions"])
+    owner: dict[str, str] = {}
+    for it in items:
+        for s in it["matched_sessions"]:
+            owner[s["session_id"]] = it.get("title") or it.get("id", "")
+
+    rows = data["sessions"] if args.all else orphans
+    label = "全セッション" if args.all else "未紐付けセッション"
+    print(f"\n=== {label} ({len(rows)}件) ===")
+    if not rows:
+        print("  (該当なし)\n")
+        return
+    for s in rows:
+        t = Usage(**s["totals"])
+        mark = owner.get(s["session_id"])
+        tag = f"→ {mark}" if mark else "未紐付け"
+        print(f"  {s['session_id'][:8]}  {fmt_date(s['started_at'])}  "
+              f"{fmt_tokens(t.total_tokens):>8}  {fmt_cost(t.cost_usd):>9}  {tag}")
+        print(f"            {s['title'][:70]}")
+    print("\n  紐付け: python3 tools/claude_ledger.py link <成果物ID> <セッションID...>\n")
+
+
 def cmd_daily(args) -> None:
     from ledger_html import aggregate_daily
 
@@ -511,6 +618,20 @@ def main() -> None:
     p_add.add_argument("--notes")
     p_add.add_argument("--sessions", help="セッションID(前方一致可)をカンマ区切り")
     p_add.set_defaults(func=cmd_add)
+
+    p_sessions = sub.add_parser("sessions", help="セッション一覧とID を表示")
+    p_sessions.add_argument("--all", action="store_true", help="紐付け済みも含めて表示")
+    p_sessions.set_defaults(func=cmd_sessions)
+
+    p_link = sub.add_parser("link", help="既存の成果物にセッションを紐付け")
+    p_link.add_argument("deliverable", help="成果物の id またはタイトル(部分一致可)")
+    p_link.add_argument("sessions", nargs="+", help="セッションID (8桁の前方一致可)")
+    p_link.set_defaults(func=cmd_link)
+
+    p_unlink = sub.add_parser("unlink", help="紐付けを外す")
+    p_unlink.add_argument("deliverable")
+    p_unlink.add_argument("sessions", nargs="+")
+    p_unlink.set_defaults(func=cmd_unlink)
 
     p_build = sub.add_parser("build", help="HTML ダッシュボードを生成")
     p_build.set_defaults(func=cmd_build)

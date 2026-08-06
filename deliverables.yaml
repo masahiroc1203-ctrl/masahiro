@@ -6,20 +6,23 @@
 #
 # status: 未着手 / 進行中 / レビュー中 / 保留 / 完了 / アーカイブ
 #
-# 追加コマンド:
-#   python3 tools/claude_ledger.py add "タイトル" --status 進行中 --sessions 68d1c943
-# 集計とダッシュボード生成:
-#   python3 tools/claude_ledger.py all
-
+# 主なコマンド:
+#   python3 tools/claude_ledger.py sessions              # 未紐付けセッションとIDを一覧
+#   python3 tools/claude_ledger.py link <id> <session>   # 既存の成果物に紐付け
+#   python3 tools/claude_ledger.py add "タイトル"          # 新規登録
+#   python3 tools/claude_ledger.py all                   # 集計 + ダッシュボード生成
+#
+# ※ このファイルはツールが書き戻す際に再生成されるため、
+#    ここより下に書いたコメントは保持されません。
 deliverables:
-  - id: claude-ledger
-    title: Claude 成果物管理ダッシュボード
-    status: レビュー中
-    tags:
-      - ツール
-      - 可視化
-    link: https://github.com/masahiroc1203-ctrl/masahiro
-    notes: セッションログからモデル・トークン・コストを集計し、成果物台帳と突き合わせて HTML ダッシュボードを生成する CLI。
-    updated: 2026-08-06
-    sessions:
-      - 68d1c943
+- id: claude-ledger
+  title: Claude 成果物管理ダッシュボード
+  status: レビュー中
+  tags:
+  - ツール
+  - 可視化
+  link: https://github.com/masahiroc1203-ctrl/masahiro
+  notes: セッションログからモデル・トークン・コストを集計し、成果物台帳と突き合わせて HTML ダッシュボードを生成する CLI。
+  updated: 2026-08-06
+  sessions:
+  - 68d1c943

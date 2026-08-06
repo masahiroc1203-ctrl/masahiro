@@ -14,8 +14,15 @@ Claude で作った成果物を、**進捗状況・使用モデル・使用ト�
 # 1. ログを集計（data/sessions.json を生成）
 python3 tools/claude_ledger.py scan
 
-# 2. 成果物を台帳に登録（セッションIDは8桁の前方一致でOK）
+# 2. セッションIDを確認する
+python3 tools/claude_ledger.py sessions
+
+# 3. 成果物を台帳に登録（セッションIDは8桁の前方一致でOK）
 python3 tools/claude_ledger.py add "新機能の設計" --status 進行中 --sessions 68d1c943 --tags 設計
+
+# すでにある成果物にセッションを追加／削除する
+python3 tools/claude_ledger.py link 新機能 a1b2c3d4 e5f6a7b8
+python3 tools/claude_ledger.py unlink 新機能 e5f6a7b8
 
 # 3. ダッシュボードを生成
 python3 tools/claude_ledger.py build
@@ -64,6 +71,31 @@ deliverables:
 
 `sessions` に紐付けなかったセッションは、ダッシュボードの「未紐付けセッション」に一覧されるので、
 そこから台帳へ割り当てていく運用になります。
+
+## セッションの紐付け方
+
+```bash
+# 1. 未紐付けのセッションとIDを確認（--all で紐付け済みも表示）
+python3 tools/claude_ledger.py sessions
+
+# 2. 既存の成果物へ紐付け。成果物は id でもタイトル部分一致でも指定できる
+python3 tools/claude_ledger.py link claude-ledger a1b2c3d4 e5f6a7b8
+
+# 新しい成果物として登録しつつ紐付ける場合
+python3 tools/claude_ledger.py add "リファクタリング" --sessions a1b2c3d4
+
+# 3. 再集計
+python3 tools/claude_ledger.py all
+```
+
+`deliverables.yaml` の `sessions:` に直接書き足しても同じです。1つの成果物に複数セッションを
+並べれば合算され、複数日にまたがる作業もまとめて集計されます。
+
+> **注意:** 集計対象は「そのコマンドを実行したマシンの `~/.claude/projects`」です。
+> ローカルとクラウド（Claude Code on the web）など複数の環境で作業している場合、
+> それぞれの環境で `scan` する必要があります。`link` で指定したIDが現在のログに
+> 見つからない場合は警告が出ますが、台帳への登録自体は行われるので、
+> あとで該当マシンで `scan` すれば紐付きます。
 
 ## 集計の注意点
 
