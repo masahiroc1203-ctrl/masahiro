@@ -91,11 +91,41 @@ python3 tools/claude_ledger.py all
 `deliverables.yaml` の `sessions:` に直接書き足しても同じです。1つの成果物に複数セッションを
 並べれば合算され、複数日にまたがる作業もまとめて集計されます。
 
-> **注意:** 集計対象は「そのコマンドを実行したマシンの `~/.claude/projects`」です。
-> ローカルとクラウド（Claude Code on the web）など複数の環境で作業している場合、
-> それぞれの環境で `scan` する必要があります。`link` で指定したIDが現在のログに
-> 見つからない場合は警告が出ますが、台帳への登録自体は行われるので、
-> あとで該当マシンで `scan` すれば紐付きます。
+## 複数マシンのセッションをまとめる
+
+ログはマシンごとにローカルへ保存されるため、ローカルPCとクラウド（Claude Code on the web）の
+両方で作業している場合は、**それぞれの環境で `scan` を実行**します。
+
+`scan` は集計結果を**マージ**します。各セッションには実行マシン名（既定はホスト名）が
+記録され、再スキャンで差し替わるのは**自分のマシン分だけ**です。他マシンの集計結果は保持されます。
+
+```bash
+# ローカルPCで
+git clone https://github.com/masahiroc1203-ctrl/masahiro && cd masahiro
+python3 tools/claude_ledger.py scan          # ローカル分を追加
+git add data/sessions.json && git commit -m "ローカル分を集計" && git push
+
+# クラウド側で
+git pull
+python3 tools/claude_ledger.py all           # クラウド分を追加してダッシュボード再生成
+```
+
+`data/sessions.json` をリポジトリで共有することで、両方のマシンの使用量が1つの
+ダッシュボードに合算されます。
+
+```bash
+# マシン名を明示する（既定はホスト名。CLAUDE_LEDGER_HOST 環境変数でも指定可）
+python3 tools/claude_ledger.py scan --host macbook
+
+# ログの置き場所が複数ある場合はまとめて指定できる
+python3 tools/claude_ledger.py scan --log-root ~/.claude/projects ~/work/.claude/projects
+
+# 他マシン分も破棄して作り直す
+python3 tools/claude_ledger.py scan --replace
+```
+
+> `link` で指定したIDが現在のログに見つからない場合は警告が出ますが、台帳への登録自体は
+> 行われます。先に紐付けておいて、あとで該当マシンで `scan` する順序でも問題ありません。
 
 ## 集計の注意点
 

@@ -1,7 +1,8 @@
 {
-  "generated_at": "2026-08-06T20:40:36.591833+00:00",
+  "generated_at": "2026-08-06T20:44:03.142174+00:00",
   "log_root": "/root/.claude/projects",
   "timezone": "Asia/Tokyo",
+  "host": "vm",
   "sessions": [
     {
       "session_id": "68d1c943-7f46-5830-9e28-f8e17345ed8a",
@@ -12,16 +13,16 @@
       "cli_version": "2.1.223",
       "title": "Claudeで作った成果物をまとめて管理したい",
       "started_at": "2026-08-06T03:47:26.011000+00:00",
-      "ended_at": "2026-08-06T20:40:36.127000+00:00",
-      "duration_sec": 60790,
-      "user_turns": 4,
-      "assistant_turns": 50,
+      "ended_at": "2026-08-06T20:44:02.760000+00:00",
+      "duration_sec": 60996,
+      "user_turns": 5,
+      "assistant_turns": 63,
       "sidechain_requests": 0,
       "tool_calls": {
-        "Edit": 22,
-        "Bash": 20,
+        "Edit": 33,
+        "Bash": 24,
+        "Read": 5,
         "Write": 4,
-        "Read": 4,
         "Skill": 2,
         "Artifact": 2,
         "SendUserFile": 2,
@@ -31,13 +32,13 @@
       },
       "models": {
         "claude-opus-5": {
-          "requests": 50,
-          "input": 127,
-          "output": 55347,
+          "requests": 63,
+          "input": 150,
+          "output": 66031,
           "cache_write_5m": 0,
-          "cache_write_1h": 901777,
-          "cache_read": 18069378,
-          "cost_usd": 19.436768999999995
+          "cache_write_1h": 914317,
+          "cache_read": 24065478,
+          "cost_usd": 22.827433999999997
         }
       },
       "daily": {
@@ -51,25 +52,26 @@
           "cost_usd": 13.643022999999994
         },
         "2026-08-07": {
-          "requests": 6,
-          "input": 12,
-          "output": 4742,
+          "requests": 19,
+          "input": 35,
+          "output": 15426,
           "cache_write_5m": 0,
-          "cache_write_1h": 454665,
-          "cache_read": 2256972,
-          "cost_usd": 5.793746
+          "cache_write_1h": 467205,
+          "cache_read": 8253072,
+          "cost_usd": 9.184410999999999
         }
       },
       "totals": {
-        "requests": 50,
-        "input": 127,
-        "output": 55347,
+        "requests": 63,
+        "input": 150,
+        "output": 66031,
         "cache_write_5m": 0,
-        "cache_write_1h": 901777,
-        "cache_read": 18069378,
-        "cost_usd": 19.436768999999995
+        "cache_write_1h": 914317,
+        "cache_read": 24065478,
+        "cost_usd": 22.827433999999997
       },
-      "unpriced_models": []
+      "unpriced_models": [],
+      "host": "vm"
     }
   ]
 }

@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import socket
 import sys
 from collections import Counter, defaultdict
 from dataclasses import dataclass, asdict
@@ -181,6 +182,11 @@ def is_real_user_prompt(record: dict) -> bool:
     return True
 
 
+def default_host() -> str:
+    """このマシンの識別名。環境変数で上書き可能。"""
+    return os.environ.get("CLAUDE_LEDGER_HOST") or socket.gethostname() or "unknown"
+
+
 def scan_session(path: Path, tz: ZoneInfo) -> dict | None:
     """1 セッション分の JSONL を集計して dict を返す。"""
     per_model: dict[str, Usage] = defaultdict(Usage)
@@ -275,23 +281,36 @@ def scan_session(path: Path, tz: ZoneInfo) -> dict | None:
     }
 
 
-def scan(log_root: Path, tz: ZoneInfo) -> dict:
-    if not log_root.exists():
-        sys.exit(f"ログディレクトリが見つかりません: {log_root}")
+def scan(log_roots: list[Path], tz: ZoneInfo, host: str) -> dict:
+    """指定したログディレクトリ群を集計する。各セッションに host を付与。"""
+    existing = [r for r in log_roots if r.exists()]
+    if not existing:
+        sys.exit("ログディレクトリが見つかりません: "
+                 + ", ".join(str(r) for r in log_roots))
+    for missing in [r for r in log_roots if not r.exists()]:
+        print(f"  ! 見つからないのでスキップ: {missing}", file=sys.stderr)
+
     sessions = []
-    for path in sorted(log_root.glob("**/*.jsonl")):
-        try:
-            data = scan_session(path, tz)
-        except Exception as exc:  # 壊れたログでも全体は止めない
-            print(f"  ! スキップ {path.name}: {exc}", file=sys.stderr)
-            continue
-        if data:
-            sessions.append(data)
+    seen: set[str] = set()
+    for root in existing:
+        for path in sorted(root.glob("**/*.jsonl")):
+            if path.stem in seen:      # 同じセッションが複数ルートに現れた場合
+                continue
+            try:
+                data = scan_session(path, tz)
+            except Exception as exc:  # 壊れたログでも全体は止めない
+                print(f"  ! スキップ {path.name}: {exc}", file=sys.stderr)
+                continue
+            if data:
+                data["host"] = host
+                sessions.append(data)
+                seen.add(path.stem)
     sessions.sort(key=lambda s: s["started_at"] or "", reverse=True)
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "log_root": str(log_root),
+        "log_root": ", ".join(str(r) for r in existing),
         "timezone": str(tz),
+        "host": host,
         "sessions": sessions,
     }
 
@@ -411,15 +430,43 @@ def cmd_scan(args) -> None:
         tz = ZoneInfo(args.tz)
     except Exception:
         sys.exit(f"不明なタイムゾーンです: {args.tz}")
-    result = scan(Path(args.log_root).expanduser(), tz)
+
+    host = args.host or default_host()
+    roots = [Path(r).expanduser() for r in args.log_root]
+    result = scan(roots, tz, host)
+    fresh_count = len(result["sessions"])
+
+    # 他マシンで集計した分は保持し、このマシン分だけ差し替える。
+    carried = 0
+    if not args.replace and DATA_PATH.exists():
+        try:
+            with DATA_PATH.open(encoding="utf-8") as fh:
+                previous = json.load(fh)
+        except (json.JSONDecodeError, OSError) as exc:
+            print(f"  ! 既存の集計結果を読めないため新規作成します: {exc}", file=sys.stderr)
+            previous = {"sessions": []}
+        others = [s for s in previous.get("sessions", []) if s.get("host", host) != host]
+        carried = len(others)
+        result["sessions"] = sorted(
+            result["sessions"] + others,
+            key=lambda s: s["started_at"] or "", reverse=True,
+        )
+
     DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
     with DATA_PATH.open("w", encoding="utf-8") as fh:
         json.dump(result, fh, ensure_ascii=False, indent=2)
+
     total = Usage()
+    hosts = Counter()
     for s in result["sessions"]:
         total.add(Usage(**s["totals"]))
-    print(f"✓ {len(result['sessions'])} セッションを集計 -> {DATA_PATH.relative_to(REPO_ROOT)}")
-    print(f"  合計 {fmt_tokens(total.total_tokens)} トークン / 推定 {fmt_cost(total.cost_usd)}")
+        hosts[s.get("host", "unknown")] += 1
+    print(f"✓ {fresh_count} セッションを集計 ({host}) -> {DATA_PATH.relative_to(REPO_ROOT)}")
+    if carried:
+        print(f"  他マシン分 {carried} セッションを保持 "
+              f"({', '.join(f'{h}:{n}' for h, n in hosts.items() if h != host)})")
+    print(f"  合計 {len(result['sessions'])} セッション / "
+          f"{fmt_tokens(total.total_tokens)} トークン / 推定 {fmt_cost(total.cost_usd)}")
 
 
 def cmd_report(args) -> None:
@@ -543,6 +590,7 @@ def cmd_sessions(args) -> None:
         mark = owner.get(s["session_id"])
         tag = f"→ {mark}" if mark else "未紐付け"
         print(f"  {s['session_id'][:8]}  {fmt_date(s['started_at'])}  "
+              f"[{s.get('host', '?')}]  "
               f"{fmt_tokens(t.total_tokens):>8}  {fmt_cost(t.cost_usd):>9}  {tag}")
         print(f"            {s['title'][:70]}")
     print("\n  紐付け: python3 tools/claude_ledger.py link <成果物ID> <セッションID...>\n")
@@ -596,9 +644,16 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Claude 成果物台帳")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
+    def add_scan_args(p):
+        p.add_argument("--log-root", nargs="+", default=[str(DEFAULT_LOG_ROOT)],
+                       help="ログディレクトリ (複数指定可)")
+        p.add_argument("--tz", default=DEFAULT_TZ, help=f"日次集計の基準TZ (既定 {DEFAULT_TZ})")
+        p.add_argument("--host", help=f"マシン識別名 (既定 {default_host()})")
+        p.add_argument("--replace", action="store_true",
+                       help="他マシン分も含めて集計結果を作り直す")
+
     p_scan = sub.add_parser("scan", help="セッションログを集計")
-    p_scan.add_argument("--log-root", default=str(DEFAULT_LOG_ROOT))
-    p_scan.add_argument("--tz", default=DEFAULT_TZ, help=f"日次集計の基準TZ (既定 {DEFAULT_TZ})")
+    add_scan_args(p_scan)
     p_scan.set_defaults(func=cmd_scan)
 
     p_daily = sub.add_parser("daily", help="日単位のトークン使用量を表示")
@@ -637,8 +692,7 @@ def main() -> None:
     p_build.set_defaults(func=cmd_build)
 
     p_all = sub.add_parser("all", help="scan と build をまとめて実行")
-    p_all.add_argument("--log-root", default=str(DEFAULT_LOG_ROOT))
-    p_all.add_argument("--tz", default=DEFAULT_TZ, help=f"日次集計の基準TZ (既定 {DEFAULT_TZ})")
+    add_scan_args(p_all)
     p_all.set_defaults(func=lambda a: (cmd_scan(a), cmd_build(a)))
 
     sys.path.insert(0, str(Path(__file__).resolve().parent))

@@ -376,8 +376,16 @@ def render_dashboard(data: dict, items: list[dict], orphans: list[dict]) -> str:
     add("<h1>Claude 成果物ダッシュボード</h1>")
     add("<p>Claude Code のセッションログから使用モデル・トークン・推定コストを自動集計し、"
         "手動登録した成果物レジストリと突き合わせた台帳です。</p>")
+    host_counts: dict[str, int] = {}
+    for s in sessions:
+        host_counts[s.get("host", "unknown")] = host_counts.get(s.get("host", "unknown"), 0) + 1
+
     add('<div class="stamp">')
     add(f'<span>生成 <span class="num">{esc(fmt_dt(data["generated_at"]))}</span></span>')
+    if host_counts:
+        hosts = " / ".join(f"{esc(h)} <span class='num'>{n}</span>"
+                           for h, n in sorted(host_counts.items()))
+        add(f"<span>マシン {hosts}</span>")
     add(f'<span>ログ元 <code>{esc(data["log_root"])}</code></span>')
     add("</div></header>")
 
@@ -573,7 +581,8 @@ def render_dashboard(data: dict, items: list[dict], orphans: list[dict]) -> str:
         f'<span class="meta">{len(orphans)} 件 — 成果物に割り当てると台帳へ集計されます</span></div>')
     if orphans:
         add('<div class="sheet"><table>')
-        add("<thead><tr><th>ID</th><th>開始</th><th>プロジェクト / ブランチ</th><th>概要</th>"
+        add("<thead><tr><th>ID</th><th>開始</th><th>マシン</th>"
+            "<th>プロジェクト / ブランチ</th><th>概要</th>"
             "<th class='right'>往復</th><th class='right'>時間</th>"
             "<th class='right'>トークン</th><th class='right'>推定コスト</th></tr></thead><tbody>")
         for s in orphans:
@@ -584,6 +593,7 @@ def render_dashboard(data: dict, items: list[dict], orphans: list[dict]) -> str:
             add("<tr>"
                 f'<td><code>{esc(s["session_id"][:8])}</code></td>'
                 f'<td class="nowrap num dim">{esc(fmt_dt(s["started_at"]))}</td>'
+                f'<td class="nowrap dim">{esc(s.get("host", "—"))}</td>'
                 f'<td class="dim">{esc(branch)}</td>'
                 f'<td class="title-cell">{esc(s["title"] or "(無題)")}</td>'
                 f'<td class="right num">{s["user_turns"]}</td>'
