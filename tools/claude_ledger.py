@@ -20,9 +20,10 @@ import json
 import os
 import sys
 from collections import Counter, defaultdict
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 try:
     import yaml
@@ -61,6 +62,9 @@ CACHE_READ = 0.10
 
 STATUS_ORDER = ["進行中", "レビュー中", "未着手", "保留", "完了", "アーカイブ"]
 DEFAULT_STATUS = "進行中"
+
+# 日次集計の基準タイムゾーン。ログは UTC なので、日付の切れ目をここで決める。
+DEFAULT_TZ = "Asia/Tokyo"
 
 
 # --------------------------------------------------------------------------
@@ -177,9 +181,10 @@ def is_real_user_prompt(record: dict) -> bool:
     return True
 
 
-def scan_session(path: Path) -> dict | None:
+def scan_session(path: Path, tz: ZoneInfo) -> dict | None:
     """1 セッション分の JSONL を集計して dict を返す。"""
     per_model: dict[str, Usage] = defaultdict(Usage)
+    per_day: dict[str, Usage] = defaultdict(Usage)
     tools = Counter()
     seen_message_ids: set[str] = set()
     timestamps: list[datetime] = []
@@ -231,9 +236,10 @@ def scan_session(path: Path) -> dict | None:
                 usage = msg.get("usage") or {}
                 if not usage or model == "<synthetic>":
                     continue
-                per_model[model].add(
-                    usage_from_record(usage, model, ts, usage.get("speed"))
-                )
+                u = usage_from_record(usage, model, ts, usage.get("speed"))
+                per_model[model].add(u)
+                if ts:
+                    per_day[ts.astimezone(tz).date().isoformat()].add(u)
 
     if not per_model and not user_turns:
         return None
@@ -263,18 +269,19 @@ def scan_session(path: Path) -> dict | None:
         "sidechain_requests": sidechain_requests,
         "tool_calls": dict(tools.most_common()),
         "models": {m: asdict(u) for m, u in sorted(per_model.items())},
+        "daily": {d: asdict(u) for d, u in sorted(per_day.items())},
         "totals": asdict(totals),
         "unpriced_models": unknown,
     }
 
 
-def scan(log_root: Path) -> dict:
+def scan(log_root: Path, tz: ZoneInfo) -> dict:
     if not log_root.exists():
         sys.exit(f"ログディレクトリが見つかりません: {log_root}")
     sessions = []
     for path in sorted(log_root.glob("**/*.jsonl")):
         try:
-            data = scan_session(path)
+            data = scan_session(path, tz)
         except Exception as exc:  # 壊れたログでも全体は止めない
             print(f"  ! スキップ {path.name}: {exc}", file=sys.stderr)
             continue
@@ -284,6 +291,7 @@ def scan(log_root: Path) -> dict:
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "log_root": str(log_root),
+        "timezone": str(tz),
         "sessions": sessions,
     }
 
@@ -377,7 +385,11 @@ def fmt_date(iso: str | None) -> str:
 # コマンド
 # --------------------------------------------------------------------------
 def cmd_scan(args) -> None:
-    result = scan(Path(args.log_root).expanduser())
+    try:
+        tz = ZoneInfo(args.tz)
+    except Exception:
+        sys.exit(f"不明なタイムゾーンです: {args.tz}")
+    result = scan(Path(args.log_root).expanduser(), tz)
     DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
     with DATA_PATH.open("w", encoding="utf-8") as fh:
         json.dump(result, fh, ensure_ascii=False, indent=2)
@@ -429,6 +441,38 @@ def cmd_add(args) -> None:
     print(f"✓ 追加: [{entry['status']}] {entry['title']}  (id: {entry['id']})")
 
 
+def cmd_daily(args) -> None:
+    from ledger_html import aggregate_daily
+
+    data = load_sessions()
+    rows = aggregate_daily(data["sessions"])
+    if args.days:
+        rows = rows[-args.days:]
+    if not rows:
+        print("集計対象の日次データがありません。")
+        return
+
+    tz = data.get("timezone", DEFAULT_TZ)
+    print(f"\n=== 日次トークン使用量 ({tz}) ===")
+    print(f"{'日付':<12}{'ｾｯｼｮﾝ':>6}{'入力':>10}{'出力':>10}"
+          f"{'ｷｬｯｼｭ書込':>12}{'ｷｬｯｼｭ読込':>12}{'合計':>10}{'推定コスト':>12}")
+    total = Usage()
+    peak = max(r["usage"].total_tokens for r in rows) or 1
+    for r in rows:
+        u = r["usage"]
+        total.add(u)
+        bar = "▍" * round(u.total_tokens / peak * 24)
+        print(f"{r['date']:<12}{r['sessions']:>6}{fmt_tokens(u.input):>10}"
+              f"{fmt_tokens(u.output):>10}{fmt_tokens(u.cache_write_5m + u.cache_write_1h):>12}"
+              f"{fmt_tokens(u.cache_read):>12}{fmt_tokens(u.total_tokens):>10}"
+              f"{fmt_cost(u.cost_usd):>12}  {bar}")
+    print(f"{'合計':<12}{'':>6}{fmt_tokens(total.input):>10}{fmt_tokens(total.output):>10}"
+          f"{fmt_tokens(total.cache_write_5m + total.cache_write_1h):>12}"
+          f"{fmt_tokens(total.cache_read):>12}{fmt_tokens(total.total_tokens):>10}"
+          f"{fmt_cost(total.cost_usd):>12}")
+    print()
+
+
 def cmd_build(args) -> None:
     from ledger_html import render_dashboard  # noqa: F401  (同ディレクトリ)
 
@@ -447,7 +491,12 @@ def main() -> None:
 
     p_scan = sub.add_parser("scan", help="セッションログを集計")
     p_scan.add_argument("--log-root", default=str(DEFAULT_LOG_ROOT))
+    p_scan.add_argument("--tz", default=DEFAULT_TZ, help=f"日次集計の基準TZ (既定 {DEFAULT_TZ})")
     p_scan.set_defaults(func=cmd_scan)
+
+    p_daily = sub.add_parser("daily", help="日単位のトークン使用量を表示")
+    p_daily.add_argument("--days", type=int, default=30, help="直近N日 (0 で全期間)")
+    p_daily.set_defaults(func=cmd_daily)
 
     p_report = sub.add_parser("report", help="ターミナルに要約表示")
     p_report.add_argument("--limit", type=int, default=20)
@@ -468,6 +517,7 @@ def main() -> None:
 
     p_all = sub.add_parser("all", help="scan と build をまとめて実行")
     p_all.add_argument("--log-root", default=str(DEFAULT_LOG_ROOT))
+    p_all.add_argument("--tz", default=DEFAULT_TZ, help=f"日次集計の基準TZ (既定 {DEFAULT_TZ})")
     p_all.set_defaults(func=lambda a: (cmd_scan(a), cmd_build(a)))
 
     sys.path.insert(0, str(Path(__file__).resolve().parent))

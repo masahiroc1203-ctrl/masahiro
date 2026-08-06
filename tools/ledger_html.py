@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 import html
-from datetime import datetime
+from datetime import datetime, date, timedelta
 
 # ステータス -> 意味色トークン名
 STATUS_TOKEN = {
@@ -238,6 +238,31 @@ tbody tr:hover { background: color-mix(in srgb, var(--brass) 6%, transparent); }
 .meter { display: block; width: 100%; height: 5px; background: var(--rule); margin-top: .4rem; }
 .meter i { display: block; height: 100%; background: var(--brass); }
 
+/* --- 日次チャート --- */
+.chart {
+  display: flex; align-items: flex-end; gap: 2px; height: 190px;
+  padding: 0 .1rem; border-bottom: 1px solid var(--rule-strong);
+}
+.chart .col {
+  flex: 1 1 0; min-width: 4px; height: 100%;
+  display: flex; flex-direction: column; justify-content: flex-end;
+}
+.chart .col .seg { display: block; width: 100%; }
+.chart .col .seg.k-out { background: var(--brass); }
+.chart .col .seg.k-in { background: var(--active); }
+.chart .col .seg.k-write { background: var(--review); }
+.chart .col .seg.k-read { background: var(--archived); }
+.chart .col.zero { border-bottom: 2px solid var(--rule-strong); }
+.axis {
+  display: flex; gap: 2px; padding: .4rem .1rem 0;
+  font-size: .68rem; color: var(--faint);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}
+.axis span { flex: 1 1 0; min-width: 4px; text-align: center; overflow: visible; white-space: nowrap; }
+.peak {
+  display: flex; justify-content: space-between; font-size: .72rem;
+  color: var(--faint); padding-bottom: .3rem;
+}
 .tagrow { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .35rem; }
 .tag {
   font-size: .72rem; padding: .05rem .45rem; color: var(--slate);
@@ -253,6 +278,61 @@ footer { border-top: 1px solid var(--rule); padding-top: 1rem; font-size: .8rem;
 footer p { margin: .25rem 0; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 """
+
+
+class DayUsage:
+    """日次集計の器 (claude_ledger.Usage と同じフィールドを持つ軽量版)。"""
+
+    __slots__ = ("requests", "input", "output", "cache_write_5m",
+                 "cache_write_1h", "cache_read", "cost_usd")
+
+    def __init__(self) -> None:
+        self.requests = self.input = self.output = 0
+        self.cache_write_5m = self.cache_write_1h = self.cache_read = 0
+        self.cost_usd = 0.0
+
+    def add(self, d: dict) -> None:
+        self.requests += d["requests"]
+        self.input += d["input"]
+        self.output += d["output"]
+        self.cache_write_5m += d["cache_write_5m"]
+        self.cache_write_1h += d["cache_write_1h"]
+        self.cache_read += d["cache_read"]
+        self.cost_usd += d["cost_usd"]
+
+    @property
+    def cache_write(self) -> int:
+        return self.cache_write_5m + self.cache_write_1h
+
+    @property
+    def total_tokens(self) -> int:
+        return self.input + self.output + self.cache_write + self.cache_read
+
+
+def aggregate_daily(sessions: list[dict]) -> list[dict]:
+    """全セッションを日付で束ね、活動のない日も 0 埋めした連続した日次配列を返す。"""
+    buckets: dict[str, DayUsage] = {}
+    session_days: dict[str, set[str]] = {}
+    for s in sessions:
+        for day, usage in (s.get("daily") or {}).items():
+            buckets.setdefault(day, DayUsage()).add(usage)
+            session_days.setdefault(day, set()).add(s["session_id"])
+    if not buckets:
+        return []
+
+    first = date.fromisoformat(min(buckets))
+    last = date.fromisoformat(max(buckets))
+    rows = []
+    cursor = first
+    while cursor <= last:
+        key = cursor.isoformat()
+        rows.append({
+            "date": key,
+            "usage": buckets.get(key, DayUsage()),
+            "sessions": len(session_days.get(key, ())),
+        })
+        cursor += timedelta(days=1)
+    return rows
 
 
 def status_pill(status: str) -> str:
@@ -355,6 +435,85 @@ def render_dashboard(data: dict, items: list[dict], orphans: list[dict]) -> str:
         add("</tbody></table></div>")
     else:
         add('<div class="sheet"><p class="empty">集計対象のモデル利用がありません。</p></div>')
+    add("</section>")
+
+    # ---- 日次トークン使用量 ----
+    daily = aggregate_daily(sessions)
+    tzname = data.get("timezone", "UTC")
+    add("<section>")
+    add('<div class="section-head"><h2>日次トークン使用量</h2>'
+        f'<span class="meta">{esc(tzname)} 基準 / {len(daily)} 日間</span></div>')
+    if daily:
+        active = [r for r in daily if r["usage"].total_tokens > 0]
+        peak_row = max(daily, key=lambda r: r["usage"].total_tokens)
+        peak = peak_row["usage"].total_tokens or 1
+        avg = sum(r["usage"].total_tokens for r in active) / max(len(active), 1)
+
+        add('<div class="peak">'
+            f'<span>ピーク <span class="num">{fmt_tokens(peak)}</span> '
+            f'({esc(peak_row["date"])})</span>'
+            f'<span>稼働 {len(active)} 日 / 稼働日平均 '
+            f'<span class="num">{fmt_tokens(int(avg))}</span></span></div>')
+
+        add('<div class="chart">')
+        for r in daily:
+            u = r["usage"]
+            if u.total_tokens == 0:
+                add(f'<div class="col zero" title="{esc(r["date"])} 稼働なし"></div>')
+                continue
+            tip = (f'{r["date"]} · 合計 {fmt_tokens(u.total_tokens)} · {fmt_cost(u.cost_usd)}'
+                   f' / 入力 {fmt_int(u.input)} 出力 {fmt_int(u.output)}'
+                   f' 書込 {fmt_int(u.cache_write)} 読込 {fmt_int(u.cache_read)}')
+            add(f'<div class="col" title="{esc(tip)}">')
+            for cls, value in (("k-out", u.output), ("k-in", u.input),
+                               ("k-write", u.cache_write), ("k-read", u.cache_read)):
+                if value <= 0:
+                    continue
+                height = max(value / peak * 100, 0.6)
+                add(f'<span class="seg {cls}" style="height:{height:.2f}%"></span>')
+            add("</div>")
+        add("</div>")
+
+        # ラベルは等間隔 + 末尾。末尾が直前のラベルと近すぎる場合は重なるので落とす。
+        step = max(1, -(-len(daily) // 8))
+        last = len(daily) - 1
+        marks = set(range(0, len(daily), step))
+        if last - max(marks) >= step / 2:
+            marks.add(last)
+        add('<div class="axis">')
+        for i, r in enumerate(daily):
+            label = date.fromisoformat(r["date"]).strftime("%m/%d") if i in marks else ""
+            add(f"<span>{esc(label)}</span>")
+        add("</div>")
+
+        add('<div class="legend">'
+            '<span class="item"><i class="swatch" style="background:var(--brass)"></i>出力</span>'
+            '<span class="item"><i class="swatch" style="background:var(--active)"></i>入力</span>'
+            '<span class="item"><i class="swatch" style="background:var(--review)"></i>キャッシュ書込</span>'
+            '<span class="item"><i class="swatch" style="background:var(--archived)"></i>キャッシュ読込</span>'
+            "</div>")
+
+        add('<div class="sheet"><table>')
+        add("<thead><tr><th>日付</th><th class='right'>セッション</th><th class='right'>リクエスト</th>"
+            "<th class='right'>入力</th><th class='right'>出力</th>"
+            "<th class='right'>キャッシュ書込</th><th class='right'>キャッシュ読込</th>"
+            "<th class='right'>合計</th><th class='right'>推定コスト</th></tr></thead><tbody>")
+        for r in reversed(active):
+            u = r["usage"]
+            weekday = "月火水木金土日"[date.fromisoformat(r["date"]).weekday()]
+            add("<tr>"
+                f'<td class="nowrap num">{esc(r["date"])} <span class="dim">({weekday})</span></td>'
+                f'<td class="right num">{r["sessions"]}</td>'
+                f'<td class="right num">{fmt_int(u.requests)}</td>'
+                f'<td class="right num">{fmt_int(u.input)}</td>'
+                f'<td class="right num">{fmt_int(u.output)}</td>'
+                f'<td class="right num">{fmt_int(u.cache_write)}</td>'
+                f'<td class="right num">{fmt_int(u.cache_read)}</td>'
+                f'<td class="right num">{fmt_tokens(u.total_tokens)}</td>'
+                f'<td class="right num">{fmt_cost(u.cost_usd)}</td></tr>')
+        add("</tbody></table></div>")
+    else:
+        add('<div class="sheet"><p class="empty">日次データがありません。</p></div>')
     add("</section>")
 
     # ---- 成果物台帳 ----

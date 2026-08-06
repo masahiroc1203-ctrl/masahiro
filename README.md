@@ -25,9 +25,25 @@ python3 tools/claude_ledger.py all
 
 # ターミナルで要約を見る
 python3 tools/claude_ledger.py report
+
+# 日単位のトークン使用量（既定は直近30日、0 で全期間）
+python3 tools/claude_ledger.py daily
+python3 tools/claude_ledger.py daily --days 0
 ```
 
 必要なもの: Python 3.11+ と PyYAML (`pip install pyyaml`)。
+
+## 日次トークン使用量
+
+`scan` はセッション単位の合計に加えて、**日付ごとの内訳**（入力 / 出力 / キャッシュ書込 / キャッシュ読込 / 推定コスト）も記録します。ダッシュボードには積み上げ棒グラフと日次テーブルが並び、`daily` サブコマンドではターミナルで同じ内容を確認できます。
+
+日付の切れ目は既定で **Asia/Tokyo** 基準です（ログ自体は UTC）。変更する場合は:
+
+```bash
+python3 tools/claude_ledger.py scan --tz UTC
+```
+
+セッションが日をまたいでも、リクエスト単位のタイムスタンプで正しく日別に振り分けられます。
 
 ## 台帳フォーマット
 
