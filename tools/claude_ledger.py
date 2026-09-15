@@ -634,7 +634,7 @@ def cmd_build(args) -> None:
     data = load_sessions()
     registry = load_registry()
     items, orphans = link_sessions(registry, data["sessions"])
-    html = render_dashboard(data, items, orphans)
+    html = render_dashboard(data, items, orphans, window_days=getattr(args, "days", 0))
     DASHBOARD_PATH.parent.mkdir(parents=True, exist_ok=True)
     DASHBOARD_PATH.write_text(html, encoding="utf-8")
     print(f"✓ ダッシュボード生成 -> {DASHBOARD_PATH.relative_to(REPO_ROOT)}")
@@ -689,10 +689,14 @@ def main() -> None:
     p_unlink.set_defaults(func=cmd_unlink)
 
     p_build = sub.add_parser("build", help="HTML ダッシュボードを生成")
+    p_build.add_argument("--days", type=int, default=0,
+                         help="日次チャートの表示期間を直近N日に絞る (既定 0 = 全期間)")
     p_build.set_defaults(func=cmd_build)
 
     p_all = sub.add_parser("all", help="scan と build をまとめて実行")
     add_scan_args(p_all)
+    p_all.add_argument("--days", type=int, default=0,
+                       help="日次チャートの表示期間を直近N日に絞る (既定 0 = 全期間)")
     p_all.set_defaults(func=lambda a: (cmd_scan(a), cmd_build(a)))
 
     sys.path.insert(0, str(Path(__file__).resolve().parent))

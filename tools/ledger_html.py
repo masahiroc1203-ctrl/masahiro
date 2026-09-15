@@ -340,7 +340,8 @@ def status_pill(status: str) -> str:
     return f'<span class="pill s-{token}">{esc(status)}</span>'
 
 
-def render_dashboard(data: dict, items: list[dict], orphans: list[dict]) -> str:
+def render_dashboard(data: dict, items: list[dict], orphans: list[dict],
+                     window_days: int = 0) -> str:
     sessions = data["sessions"]
 
     # ---- 全体集計 ----
@@ -446,11 +447,19 @@ def render_dashboard(data: dict, items: list[dict], orphans: list[dict]) -> str:
     add("</section>")
 
     # ---- 日次トークン使用量 ----
-    daily = aggregate_daily(sessions)
+    # 既定は全期間。稼働のない日も残すことで「使っていない期間」も情報になる。
+    # 期間が長くなりすぎる場合だけ window_days で直近に絞る。
+    full_daily = aggregate_daily(sessions)
+    if window_days and len(full_daily) > window_days:
+        daily = full_daily[-window_days:]
+        span = f"直近 {window_days} 日 / 全 {len(full_daily)} 日中"
+    else:
+        daily = full_daily
+        span = f"{len(full_daily)} 日間"
     tzname = data.get("timezone", "UTC")
     add("<section>")
     add('<div class="section-head"><h2>日次トークン使用量</h2>'
-        f'<span class="meta">{esc(tzname)} 基準 / {len(daily)} 日間</span></div>')
+        f'<span class="meta">{esc(tzname)} 基準 / {esc(span)}</span></div>')
     if daily:
         active = [r for r in daily if r["usage"].total_tokens > 0]
         peak_row = max(daily, key=lambda r: r["usage"].total_tokens)
