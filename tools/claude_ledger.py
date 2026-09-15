@@ -438,6 +438,7 @@ def cmd_scan(args) -> None:
 
     # 他マシンで集計した分は保持し、このマシン分だけ差し替える。
     carried = 0
+    scanned = {host: datetime.now(timezone.utc).isoformat()}
     if not args.replace and DATA_PATH.exists():
         try:
             with DATA_PATH.open(encoding="utf-8") as fh:
@@ -451,6 +452,11 @@ def cmd_scan(args) -> None:
             result["sessions"] + others,
             key=lambda s: s["started_at"] or "", reverse=True,
         )
+        # 他マシンの最終スキャン日時は引き継ぐ (いつの情報かを追えるように)
+        for h, when in (previous.get("scanned_at") or {}).items():
+            if h != host:
+                scanned[h] = when
+    result["scanned_at"] = scanned
 
     DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
     with DATA_PATH.open("w", encoding="utf-8") as fh:

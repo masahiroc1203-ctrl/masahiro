@@ -263,6 +263,11 @@ tbody tr:hover { background: color-mix(in srgb, var(--brass) 6%, transparent); }
   display: flex; justify-content: space-between; font-size: .72rem;
   color: var(--faint); padding-bottom: .3rem;
 }
+.caveat {
+  margin: 0; font-size: .78rem; line-height: 1.6; color: var(--slate);
+  border-left: 3px solid var(--brass); padding: .1rem 0 .1rem .75rem;
+}
+.caveat strong { color: var(--ink); font-weight: 600; }
 .tagrow { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .35rem; }
 .tag {
   font-size: .72rem; padding: .05rem .45rem; color: var(--slate);
@@ -380,14 +385,14 @@ def render_dashboard(data: dict, items: list[dict], orphans: list[dict],
     host_counts: dict[str, int] = {}
     for s in sessions:
         host_counts[s.get("host", "unknown")] = host_counts.get(s.get("host", "unknown"), 0) + 1
+    scanned_at = data.get("scanned_at") or {}
 
     add('<div class="stamp">')
     add(f'<span>生成 <span class="num">{esc(fmt_dt(data["generated_at"]))}</span></span>')
-    if host_counts:
-        hosts = " / ".join(f"{esc(h)} <span class='num'>{n}</span>"
-                           for h, n in sorted(host_counts.items()))
-        add(f"<span>マシン {hosts}</span>")
-    add(f'<span>ログ元 <code>{esc(data["log_root"])}</code></span>')
+    for h, n in sorted(host_counts.items()):
+        when = fmt_dt(scanned_at.get(h)) if scanned_at.get(h) else "—"
+        add(f'<span>{esc(h)} <span class="num">{n}</span> 件 '
+            f'<span class="dim">(最終スキャン {esc(when)})</span></span>')
     add("</div></header>")
 
     # ---- KPI ----
@@ -509,6 +514,10 @@ def render_dashboard(data: dict, items: list[dict], orphans: list[dict],
             '<span class="item"><i class="swatch" style="background:var(--review)"></i>キャッシュ書込</span>'
             '<span class="item"><i class="swatch" style="background:var(--archived)"></i>キャッシュ読込</span>'
             "</div>")
+        add('<p class="caveat">空白の日は<strong>「ログが存在しない」</strong>という意味で、'
+            '使っていなかったとは限りません。Claude Code は古いセッションログを自動削除し'
+            '（既定30日）、クラウド環境ではコンテナ再作成時にも失われます。'
+            'スキャンしていないマシンの作業も空白になります。</p>')
 
         add('<div class="sheet"><table>')
         add("<thead><tr><th>日付</th><th class='right'>セッション</th><th class='right'>リクエスト</th>"

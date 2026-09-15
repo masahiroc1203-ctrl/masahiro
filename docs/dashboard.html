@@ -194,6 +194,11 @@ tbody tr:hover { background: color-mix(in srgb, var(--brass) 6%, transparent); }
   display: flex; justify-content: space-between; font-size: .72rem;
   color: var(--faint); padding-bottom: .3rem;
 }
+.caveat {
+  margin: 0; font-size: .78rem; line-height: 1.6; color: var(--slate);
+  border-left: 3px solid var(--brass); padding: .1rem 0 .1rem .75rem;
+}
+.caveat strong { color: var(--ink); font-weight: 600; }
 .tagrow { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .35rem; }
 .tag {
   font-size: .72rem; padding: .05rem .45rem; color: var(--slate);
@@ -215,32 +220,31 @@ footer p { margin: .25rem 0; }
 <h1>Claude 成果物ダッシュボード</h1>
 <p>Claude Code のセッションログから使用モデル・トークン・推定コストを自動集計し、手動登録した成果物レジストリと突き合わせた台帳です。</p>
 <div class="stamp">
-<span>生成 <span class="num">2026-09-15 13:44</span></span>
-<span>マシン vm <span class='num'>1</span></span>
-<span>ログ元 <code>/root/.claude/projects</code></span>
+<span>生成 <span class="num">2026-09-15 13:49</span></span>
+<span>vm <span class="num">1</span> 件 <span class="dim">(最終スキャン 2026-09-15 13:49)</span></span>
 </div></header>
 <div class="kpis">
 <div class="kpi"><span class="label">成果物</span><span class="value num">1</span><span class="sub">うち進行中 1 件</span></div>
 <div class="kpi"><span class="label">セッション</span><span class="value num">1</span><span class="sub">未紐付け 0 件</span></div>
-<div class="kpi"><span class="label">総トークン</span><span class="value num">35.53M</span><span class="sub">API リクエスト 84 回</span></div>
-<div class="kpi accent"><span class="label">推定コスト</span><span class="value num">$32.90</span><span class="sub">公開価格ベースの概算</span></div>
+<div class="kpi"><span class="label">総トークン</span><span class="value num">42.92M</span><span class="sub">API リクエスト 98 回</span></div>
+<div class="kpi accent"><span class="label">推定コスト</span><span class="value num">$37.08</span><span class="sub">公開価格ベースの概算</span></div>
 </div>
 <section>
 <div class="section-head"><h2>モデル別内訳</h2><span class="meta">コスト構成比 / 1 モデル</span></div>
 <div class="sharebar">
-<span style="width:100.00%;background:var(--m1)" title="opus 5 $32.90"></span>
+<span style="width:100.00%;background:var(--m1)" title="opus 5 $37.08"></span>
 </div>
 <div class="legend">
 <span class="item"><i class="swatch" style="background:var(--m1)"></i>opus 5 <span class="num dim">100%</span></span>
 </div>
 <div class="sheet"><table>
 <thead><tr><th>モデル</th><th class='right'>リクエスト</th><th class='right'>入力</th><th class='right'>出力</th><th class='right'>キャッシュ書込</th><th class='right'>キャッシュ読込</th><th class='right'>推定コスト</th></tr></thead><tbody>
-<tr><td class="nowrap"><i class="swatch" style="background:var(--m1);display:inline-block;margin-right:.5rem"></i><code>claude-opus-5</code></td><td class="right num">84</td><td class="right num">192</td><td class="right num">77,421</td><td class="right num">1,392,893</td><td class="right num">34,061,757</td><td class="right num">$32.90</td></tr>
+<tr><td class="nowrap"><i class="swatch" style="background:var(--m1);display:inline-block;margin-right:.5rem"></i><code>claude-opus-5</code></td><td class="right num">98</td><td class="right num">220</td><td class="right num">89,334</td><td class="right num">1,413,700</td><td class="right num">41,414,261</td><td class="right num">$37.08</td></tr>
 </tbody></table></div>
 </section>
 <section>
 <div class="section-head"><h2>日次トークン使用量</h2><span class="meta">Asia/Tokyo 基準 / 41 日間</span></div>
-<div class="peak"><span>ピーク <span class="num">16.31M</span> (2026-08-06)</span><span>稼働 3 日 / 稼働日平均 <span class="num">11.84M</span></span></div>
+<div class="peak"><span>ピーク <span class="num">16.31M</span> (2026-08-06)</span><span>稼働 3 日 / 稼働日平均 <span class="num">14.31M</span></span></div>
 <div class="chart">
 <div class="col" title="2026-08-06 · 合計 16.31M · $13.64 / 入力 115 出力 50,605 書込 447,112 読込 15,812,406">
 <span class="seg k-out" style="height:0.60%"></span>
@@ -292,11 +296,11 @@ footer p { margin: .25rem 0; }
 <div class="col zero" title="2026-09-12 稼働なし"></div>
 <div class="col zero" title="2026-09-13 稼働なし"></div>
 <div class="col zero" title="2026-09-14 稼働なし"></div>
-<div class="col" title="2026-09-15 · 合計 8.61M · $9.05 / 入力 34 出力 8,992 書込 476,053 読込 8,120,235">
+<div class="col" title="2026-09-15 · 合計 15.99M · $13.23 / 入力 62 出力 20,905 書込 496,860 読込 15,472,739">
 <span class="seg k-out" style="height:0.60%"></span>
 <span class="seg k-in" style="height:0.60%"></span>
-<span class="seg k-write" style="height:2.92%"></span>
-<span class="seg k-read" style="height:49.79%"></span>
+<span class="seg k-write" style="height:3.05%"></span>
+<span class="seg k-read" style="height:94.87%"></span>
 </div>
 </div>
 <div class="axis">
@@ -343,9 +347,10 @@ footer p { margin: .25rem 0; }
 <span>09/15</span>
 </div>
 <div class="legend"><span class="item"><i class="swatch" style="background:var(--brass)"></i>出力</span><span class="item"><i class="swatch" style="background:var(--active)"></i>入力</span><span class="item"><i class="swatch" style="background:var(--review)"></i>キャッシュ書込</span><span class="item"><i class="swatch" style="background:var(--archived)"></i>キャッシュ読込</span></div>
+<p class="caveat">空白の日は<strong>「ログが存在しない」</strong>という意味で、使っていなかったとは限りません。Claude Code は古いセッションログを自動削除し（既定30日）、クラウド環境ではコンテナ再作成時にも失われます。スキャンしていないマシンの作業も空白になります。</p>
 <div class="sheet"><table>
 <thead><tr><th>日付</th><th class='right'>セッション</th><th class='right'>リクエスト</th><th class='right'>入力</th><th class='right'>出力</th><th class='right'>キャッシュ書込</th><th class='right'>キャッシュ読込</th><th class='right'>合計</th><th class='right'>推定コスト</th></tr></thead><tbody>
-<tr><td class="nowrap num">2026-09-15 <span class="dim">(火)</span></td><td class="right num">1</td><td class="right num">17</td><td class="right num">34</td><td class="right num">8,992</td><td class="right num">476,053</td><td class="right num">8,120,235</td><td class="right num">8.61M</td><td class="right num">$9.05</td></tr>
+<tr><td class="nowrap num">2026-09-15 <span class="dim">(火)</span></td><td class="right num">1</td><td class="right num">31</td><td class="right num">62</td><td class="right num">20,905</td><td class="right num">496,860</td><td class="right num">15,472,739</td><td class="right num">15.99M</td><td class="right num">$13.23</td></tr>
 <tr><td class="nowrap num">2026-08-07 <span class="dim">(金)</span></td><td class="right num">1</td><td class="right num">23</td><td class="right num">43</td><td class="right num">17,824</td><td class="right num">469,728</td><td class="right num">10,129,116</td><td class="right num">10.62M</td><td class="right num">$10.21</td></tr>
 <tr><td class="nowrap num">2026-08-06 <span class="dim">(木)</span></td><td class="right num">1</td><td class="right num">44</td><td class="right num">115</td><td class="right num">50,605</td><td class="right num">447,112</td><td class="right num">15,812,406</td><td class="right num">16.31M</td><td class="right num">$13.64</td></tr>
 </tbody></table></div>
@@ -361,14 +366,14 @@ footer p { margin: .25rem 0; }
 <div class="tagrow"><span class="tag">ツール</span><span class="tag">可視化</span></div>
 <span class="meter"><i style="width:100.0%"></i></span>
 <details><summary>セッション内訳</summary><div class='subsessions'>
-<span><code>68d1c943</code> 2026-08-06 03:47 · <span class="num">$32.90</span> · Claudeで作った成果物をまとめて管理したい</span>
+<span><code>68d1c943</code> 2026-08-06 03:47 · <span class="num">$37.08</span> · Claudeで作った成果物をまとめて管理したい</span>
 </div></details>
 </td>
 <td><span class="pill s-review">レビュー中</span></td>
 <td class="dim">opus 5</td>
 <td class="right num">1</td>
-<td class="right num">35.53M</td>
-<td class="right num">$32.90</td>
+<td class="right num">42.92M</td>
+<td class="right num">$37.08</td>
 </tr>
 </tbody></table></div>
 </section>
