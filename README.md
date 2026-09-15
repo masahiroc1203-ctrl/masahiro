@@ -105,6 +105,29 @@ python3 tools/claude_ledger.py all
 `deliverables.yaml` の `sessions:` に直接書き足しても同じです。1つの成果物に複数セッションを
 並べれば合算され、複数日にまたがる作業もまとめて集計されます。
 
+## Windows での使い方
+
+```bat
+rem 初回だけ: 依存パッケージ
+pip install pyyaml tzdata
+
+rem 集計 + ダッシュボード生成 + コミット + push をまとめて
+sync.bat
+
+rem 個別に実行する場合
+ledger scan
+ledger daily --days 7
+ledger all
+```
+
+`ledger.bat` は `python` / `py -3` を自動判別し、UTF-8 モードで実行します。
+`sync.bat` は `git pull` → 集計 → `git commit` → `git push` を1ステップで行い、
+使用量に変化がなければ何もせず終了します。
+
+> **tzdata について:** Windows の Python はタイムゾーンDBを同梱していないため、
+> `tzdata` が無いと `Asia/Tokyo` を解決できません。未インストールでも固定オフセット
+> (UTC+9) にフォールバックして動作しますが、警告が出ます。`pip install tzdata` で解消します。
+
 ## 複数マシンのセッションをまとめる
 
 ログはマシンごとにローカルへ保存されるため、ローカルPCとクラウド（Claude Code on the web）の

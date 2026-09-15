@@ -22,7 +22,7 @@ import socket
 import sys
 from collections import Counter, defaultdict
 from dataclasses import dataclass, asdict
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -66,6 +66,33 @@ DEFAULT_STATUS = "進行中"
 
 # 日次集計の基準タイムゾーン。ログは UTC なので、日付の切れ目をここで決める。
 DEFAULT_TZ = "Asia/Tokyo"
+
+# Windows の Python はタイムゾーンDBを同梱しないため、tzdata を入れていないと
+# ZoneInfo("Asia/Tokyo") が失敗する。DST の無い地域は固定オフセットで代用できる。
+FIXED_OFFSETS = {"Asia/Tokyo": 9, "Asia/Seoul": 9, "Asia/Shanghai": 8,
+                 "Asia/Taipei": 8, "Asia/Kolkata": 5.5, "Asia/Bangkok": 7,
+                 "Asia/Singapore": 8, "Asia/Hong_Kong": 8, "UTC": 0, "Etc/UTC": 0}
+
+
+def resolve_tz(name: str):
+    """タイムゾーンを解決する。tzdata が無い環境では固定オフセットにフォールバック。"""
+    try:
+        return ZoneInfo(name)
+    except Exception:
+        pass
+    if name in FIXED_OFFSETS:
+        offset = FIXED_OFFSETS[name]
+        print(f"  ! タイムゾーンDB (tzdata) が見つからないため、{name} を "
+              f"UTC{offset:+g} の固定オフセットとして扱います。", file=sys.stderr)
+        print("    正確に扱うには:  pip install tzdata", file=sys.stderr)
+        return timezone(timedelta(hours=offset), name)
+    sys.exit(
+        f"タイムゾーン '{name}' を解決できません。\n"
+        "  Windows では Python にタイムゾーンDBが同梱されていません。次で解決します:\n"
+        "      pip install tzdata\n"
+        f"  もしくは固定オフセットで代用できる名前を指定してください: "
+        f"{', '.join(sorted(FIXED_OFFSETS))}"
+    )
 
 
 # --------------------------------------------------------------------------
@@ -426,10 +453,7 @@ def fmt_date(iso: str | None) -> str:
 # コマンド
 # --------------------------------------------------------------------------
 def cmd_scan(args) -> None:
-    try:
-        tz = ZoneInfo(args.tz)
-    except Exception:
-        sys.exit(f"不明なタイムゾーンです: {args.tz}")
+    tz = resolve_tz(args.tz)
 
     host = args.host or default_host()
     roots = [Path(r).expanduser() for r in args.log_root]
@@ -438,6 +462,7 @@ def cmd_scan(args) -> None:
 
     # 他マシンで集計した分は保持し、このマシン分だけ差し替える。
     carried = 0
+    previous = None
     scanned = {host: datetime.now(timezone.utc).isoformat()}
     if not args.replace and DATA_PATH.exists():
         try:
@@ -457,6 +482,15 @@ def cmd_scan(args) -> None:
             if h != host:
                 scanned[h] = when
     result["scanned_at"] = scanned
+
+    # 中身が前回と同じなら書き込まない。generated_at / scanned_at だけが動いて
+    # 毎回 git の差分になるのを防ぐ (sync 時の無意味なコミット対策)。
+    if not args.replace and previous is not None:
+        if json.dumps(result["sessions"], sort_keys=True) == \
+           json.dumps(previous.get("sessions"), sort_keys=True):
+            print(f"✓ 変更なし ({host}) — {len(result['sessions'])} セッション、"
+                  f"集計結果は据え置き")
+            return
 
     DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
     with DATA_PATH.open("w", encoding="utf-8") as fh:
