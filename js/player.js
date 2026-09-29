@@ -307,7 +307,13 @@ export function openPlayer(menu, { onClose } = {}) {
   }
 
   // Android の戻るボタンで閉じられるように履歴を1つ積む（「もう一度」のときは積み直さない）
-  if (!history.state?.player) history.pushState({ player: true }, '');
+  if (!history.state?.player) {
+    try {
+      history.pushState({ player: true }, '');
+    } catch {
+      // 履歴を操作できない埋め込み環境では戻るボタン連動なしで動かす
+    }
+  }
   function onPop() {
     if (closed) return;
     if (session.finished) {
