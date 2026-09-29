@@ -1,6 +1,6 @@
 // オフライン用サービスワーカー
 // ファイルを変更したら VERSION を上げるとキャッシュが更新される
-const VERSION = 'v1';
+const VERSION = 'v2';
 const CACHE = `hiit-weekly-${VERSION}`;
 const ASSETS = [
   './',

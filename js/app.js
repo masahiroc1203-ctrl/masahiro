@@ -110,8 +110,8 @@ window.addEventListener('hashchange', onHashChange);
 stack.push(parseHash().key);
 render();
 
-// オフライン対応（http(s) で開いたときだけ）
-if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+// オフライン対応（http(s) で開いたときだけ。Android アプリ版はファイルが APK の中にあるので不要）
+if (!window.HiitNative && 'serviceWorker' in navigator && location.protocol.startsWith('http')) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   });

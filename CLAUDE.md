@@ -9,6 +9,7 @@
 - 保存：localStorage（キー `hiit-weekly:v1`、中身は `js/store.js` の `blank()` 参照）
 - オフライン：`sw.js`（Service Worker）
 - テスト：`node:test`（Node 20 以上）／ブラウザ通し確認：Playwright（任意・開発時のみ）
+- Android アプリ版：`android/`（Kotlin・WebView。Web 版のファイルをビルド時に assets へコピーして同梱）。依存は `androidx.webkit` のみ
 
 ## ローカルで動かす
 ```bash
@@ -26,6 +27,7 @@ npm start                 # http://localhost:8080 （依存インストール不
 | `npm run check` | test ＋ lint。**コミット前に必ず実行** |
 | `npm run smoke` | スマホサイズのブラウザで全画面・ワークアウト・メニュー作成などを通し確認。スクショは `.screenshots/`。初回のみ `npm i -D playwright && npx playwright install chromium` |
 | `/dev/poses.html` | 全種目のアニメをコマ送りで一覧（`?ids=squat,lunge&n=8` で絞り込み、`&static` でライブ再生なし） |
+| `cd android && ./gradlew assembleDebug` | APK を作る（`JAVA_HOME="/c/Program Files/Android/Android Studio/jbr"`）。出力は `android/app/build/outputs/apk/debug/app-debug.apk` |
 
 ## ディレクトリ構成
 ```
@@ -57,14 +59,16 @@ dev/poses.html           ポーズ確認ページ
 - **静的ファイルを追加・改名したら `sw.js` の `ASSETS` を更新し、配布物を変えたら `VERSION` を上げる**（上げないとインストール済み端末に古いキャッシュが残る）
 - 種目の追加：`js/data/exercises.js` にオブジェクトを追加 → `/dev/poses.html?ids=新ID` で見た目確認 → `npm test`（床めり込み・IK到達を検査）
 - 色はすべて CSS トークン経由。`color-mix()` を使うときは直前に代替の単色を書く（iOS 16.2 未満対策）
+- Web 側で読み上げ・バイブ・スリープ防止・ファイル保存を足すときは、Android 版の `window.HiitNative`（`android/.../MainActivity.kt` の `Bridge`）にも対応を足す。Android の WebView には `speechSynthesis` が無い
 
 ---
 
 ## Handoff
-<!-- updated: 2026-09-29 -->
+<!-- updated: 2026-09-30 -->
 
 ### タスク概要
-スマホで使う「週替わり・部位別HIIT」アプリ。v1 はクラウドの Claude Code セッションで実装済み（PR #12・下書き、ブランチ `claude/hiit-menu-app-wxte6y`）。次はマージ → GitHub Pages 公開 → 実機での調整。
+スマホで使う「週替わり・部位別HIIT」アプリ。v1 はクラウドの Claude Code セッションで実装済み（PR #12・下書き、ブランチ `claude/hiit-menu-app-wxte6y`）。
+2026-09-30 にローカル（`C:\dev\hiit-menu-app`）へ引き継ぎ、ユーザーが Android なので **Android アプリ（APK）版** を追加した。次は実機に入れて確認。
 
 ### 決定した方針
 - ネイティブアプリではなく PWA。公開は GitHub Pages（Settings → Pages → Deploy from a branch → `main` / `(root)`、`.nojekyll` 追加済み）。公開URL予定：https://masahiroc1203-ctrl.github.io/masahiro/
@@ -73,6 +77,8 @@ dev/poses.html           ポーズ確認ページ
 - メニュー＝種目リスト×周回。`work / rest / laps / lapRest`（lapRest=0 なら周の切れ目も通常の rest）。最後のワークの後に休憩は入れない
 - 記録：ワーク区間を半分以上やったら1本。途中終了は運動10秒以上のときだけ記録
 - データは端末内のみ（アカウント・サーバーなし）。機種変更は設定画面の JSON バックアップ
+- 配布は **Android の APK を自分で入れる** 方式（2026-09-30 決定）。Play ストアには出さない。iPhone 対応は PWA（要公開）になるので今は保留
+- `masahiro` リポジトリは **public**（2026-09-30 確認）。ユーザーの原則は private。公開のままにするか、このアプリを別の private リポジトリに移すかは未決定
 
 ### 実装ステップ
 - [x] ✅ 骨格計算とアニメ（`js/pose.js`, `js/figure.js`）、35種目データ（`js/data/exercises.js`）
@@ -81,8 +87,10 @@ dev/poses.html           ポーズ確認ページ
 - [x] ✅ 動画URL登録（`js/video.js`）とワークアウト中の動画⇄アニメ切替、YouTube検索ボタン
 - [x] ✅ PWA（manifest・`sw.js`・アイコン）、ライト/ダーク
 - [x] ✅ テスト19件・lint・ブラウザ通し確認（`npm run smoke` 24項目）・CI（`.github/workflows/ci.yml`）
-- [ ] PR #12 を確認してマージ
-- [ ] GitHub Pages を有効化し、iPhone / Android の実機で確認：ビープ音・音声・バイブ・画面スリープ防止・ホーム画面追加・オフライン起動
+- [x] ✅ Android アプリ版（`android/`）：WebView＋`HiitNative`（読み上げ・バイブ・スリープ防止・バックアップ保存/読込）、戻るボタン、外部リンク、ダーク。Pixel_6 エミュレータ（Android 17）で確認済み
+- [ ] APK を実機に入れて確認：ビープ音・音声（日本語の読み上げ）・バイブ・画面スリープ防止・YouTube/mp4 動画の埋め込み再生
+- [ ] PR #12 の扱い（説明文の更新・マージ）と、リポジトリを public のままにするかを決める
+- [ ] （iPhone でも使うなら）GitHub Pages で公開して PWA として確認
 - [ ] 実機で分かりにくい種目のアニメがあればキーフレームを調整（`/dev/poses.html`）
 - [ ] よく使う種目に YouTube 動画URLを登録してみて、ワークアウト中の見え方を確認
 
@@ -100,7 +108,12 @@ dev/poses.html           ポーズ確認ページ
 - ルーティングはハッシュ。プレイヤーを開くと `history.pushState` で1段積み、端末の戻るボタンで終了確認を出す
 - **Claude.ai のプレビュー（アーティファクト）** では `confirm()`・ファイルのダウンロード・YouTube埋め込み・Service Worker が使えない。プレビューは `npx esbuild@0.24.0 js/app.js --bundle --format=iife --minify` で1本にまとめ、`css/app.css` と `index.html` の body と合わせて1つのHTMLにして公開した：https://claude.ai/artifact/C211ZY8HcULfSKecsNuHLg
 - リポジトリ直下の `test`（1バイトの空ファイル）は既存のもの。アプリとは無関係なので触っていない
+- **Android 版の注意**（エミュレータで実測）
+  - 一番上の画面で戻るを押すと終了せず `moveTaskToBack`。Activity を終了させると、その後の `onTrimMemory` で WebView（145）内部が SIGILL で落ちるため（毎回再現。裏に回すだけなら落ちない）
+  - システムバーの余白はアプリ側で付け、WebView には渡さない（渡すと CSS の `env(safe-area-inset-*)` と二重になる）
+  - テーマ色の変更（`CONFIG_ASSETS_PATHS`）では Activity が作り直される。`restoreState` できないときは最初のページを読む
+  - 動作確認は、デバッグ版の WebView に Chrome DevTools Protocol でつなぐと楽（`adb forward tcp:9222 localabstract:webview_devtools_remote_<pid>`）。エミュレータは `emulator -avd Pixel_6 -no-window`、adb には `MSYS_NO_PATHCONV=1`
 
 ### 未解決事項（CLIで判断が必要）
-- 次回最初にやること：PR #12 をマージして GitHub Pages を有効化し、スマホ実機で一通り動かす
+- 次回最初にやること：実機での APK の確認結果を聞き、不具合があれば直す
 - 検討候補（未決定・ユーザーと相談）：曜日ごとの週間計画（例：月水金に何をやるか）、部位の自動ローテーション、ウォームアップ／クールダウンの自動追加、BGM、記録のカレンダー表示

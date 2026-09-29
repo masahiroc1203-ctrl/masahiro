@@ -1,0 +1,241 @@
+package dev.masahiro.hiitweekly
+
+import android.app.Activity
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.content.pm.ApplicationInfo
+import android.net.Uri
+import android.os.Build
+import android.os.Bundle
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
+import android.speech.tts.TextToSpeech
+import android.util.Log
+import android.view.ViewGroup
+import android.view.WindowInsets
+import android.view.WindowManager
+import android.webkit.JavascriptInterface
+import android.webkit.ValueCallback
+import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import android.widget.FrameLayout
+import android.widget.Toast
+import android.window.OnBackInvokedDispatcher
+import androidx.webkit.WebViewAssetLoader
+import java.util.Locale
+
+// Web版（リポジトリ直下）を APK に同梱して WebView で表示するだけの入れ物。
+// WebView に無い機能（読み上げ・スリープ防止・ファイル保存）は Bridge で Web 側に渡す。
+class MainActivity : Activity() {
+    private lateinit var web: WebView
+    private var tts: TextToSpeech? = null
+    private var ttsReady = false
+    private var pendingSpeech: String? = null
+    private var fileCallback: ValueCallback<Array<Uri>>? = null
+    private var pendingExport: String? = null
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        val loader = WebViewAssetLoader.Builder()
+            .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this))
+            .build()
+
+        if (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0) {
+            WebView.setWebContentsDebuggingEnabled(true) // デバッグ版だけ PC の Chrome から中を調べられる
+        }
+        web = WebView(this)
+        with(web.settings) {
+            javaScriptEnabled = true
+            domStorageEnabled = true // 記録・設定は localStorage に保存している
+            mediaPlaybackRequiresUserGesture = false
+            allowFileAccess = false
+            allowContentAccess = false
+        }
+        web.addJavascriptInterface(Bridge(), "HiitNative")
+        web.webViewClient = object : WebViewClient() {
+            override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest) =
+                loader.shouldInterceptRequest(request.url)
+
+            // アプリ外のページ（YouTube検索など）は普段のブラウザで開く。動画の埋め込み（iframe）はそのまま
+            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+                if (!request.isForMainFrame || request.url.host == WebViewAssetLoader.DEFAULT_DOMAIN) return false
+                try {
+                    startActivity(Intent(Intent.ACTION_VIEW, request.url))
+                } catch (_: ActivityNotFoundException) {
+                    Toast.makeText(this@MainActivity, "開けるアプリがありません", Toast.LENGTH_SHORT).show()
+                }
+                return true
+            }
+        }
+        web.webChromeClient = object : WebChromeClient() {
+            // バックアップの「読み込む」（<input type="file">）
+            override fun onShowFileChooser(view: WebView, callback: ValueCallback<Array<Uri>>, params: FileChooserParams): Boolean {
+                fileCallback?.onReceiveValue(null)
+                fileCallback = callback
+                // .json が application/octet-stream 扱いの端末もあるので種類で絞らない（中身は Web 側で検査する）
+                val intent = Intent(Intent.ACTION_GET_CONTENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*")
+                return try {
+                    startActivityForResult(intent, REQ_OPEN)
+                    true
+                } catch (_: ActivityNotFoundException) {
+                    fileCallback = null
+                    false
+                }
+            }
+        }
+
+        val root = FrameLayout(this)
+        root.addView(web)
+        // Android 15 以降は画面の端まで描画されるので、ステータスバーとナビゲーションバーの分だけ内側に寄せる。
+        // 寄せた分は WebView に渡さない（渡すと CSS の env(safe-area-inset-*) でもう一度空いて二重になる）
+        root.setOnApplyWindowInsetsListener { v, insets ->
+            if (Build.VERSION.SDK_INT >= 30) {
+                val bars = insets.getInsets(WindowInsets.Type.systemBars())
+                v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+                WindowInsets.CONSUMED
+            } else {
+                @Suppress("DEPRECATION")
+                v.setPadding(insets.systemWindowInsetLeft, insets.systemWindowInsetTop, insets.systemWindowInsetRight, insets.systemWindowInsetBottom)
+                @Suppress("DEPRECATION")
+                insets.consumeSystemWindowInsets()
+            }
+        }
+        setContentView(root)
+
+        tts = TextToSpeech(this) { status ->
+            ttsReady = status == TextToSpeech.SUCCESS
+            Log.i(TAG, "TTS init: ${if (ttsReady) "ok" else "failed ($status)"}")
+            if (ttsReady) {
+                val lang = tts?.setLanguage(Locale.JAPAN)
+                Log.i(TAG, "TTS ja-JP: $lang")
+                tts?.setSpeechRate(1.05f)
+                pendingSpeech?.let { say(it) }
+            }
+        }
+
+        if (Build.VERSION.SDK_INT >= 33) {
+            onBackInvokedDispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT) { back() }
+        }
+        // テーマ色の変更などで作り直されたときは前の画面に戻す。まだ何も読み込んでいなかった場合は復元できないので最初から
+        if (savedInstanceState == null || web.restoreState(savedInstanceState) == null) web.loadUrl(START_URL)
+    }
+
+    // 端末の戻る：ページの履歴（下の階層・ワークアウト画面）を先に戻す。ワークアウト中は Web 側が終了確認を出す。
+    // 一番上では終了せず裏に回す（Android 12 以降の標準と同じ）。終了させると、その後に届くメモリ解放の通知で
+    // WebView 内部が異常終了するため（Android 17 エミュレータ・WebView 145 で毎回再現。裏に回すだけなら起きない）
+    private fun back() {
+        if (web.canGoBack()) web.goBack() else moveTaskToBack(true)
+    }
+
+    @Deprecated("Android 12 以前だけで使う")
+    override fun onBackPressed() = back()
+
+    private fun say(text: String) {
+        if (!ttsReady) {
+            pendingSpeech = text
+            return
+        }
+        pendingSpeech = null
+        Log.d(TAG, "speak: $text")
+        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "hiit")
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        when (requestCode) {
+            REQ_OPEN -> {
+                fileCallback?.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(resultCode, data))
+                fileCallback = null
+            }
+            REQ_SAVE -> {
+                val uri = data?.data
+                val text = pendingExport
+                pendingExport = null
+                if (resultCode != RESULT_OK || uri == null || text == null) return
+                val ok = runCatching {
+                    contentResolver.openOutputStream(uri, "wt")!!.use { it.write(text.toByteArray()) }
+                }.isSuccess
+                Toast.makeText(this, if (ok) "バックアップを保存しました" else "保存できませんでした", Toast.LENGTH_SHORT).show()
+            }
+            else -> super.onActivityResult(requestCode, resultCode, data)
+        }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        web.saveState(outState)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        web.onPause()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        web.onResume()
+    }
+
+    override fun onDestroy() {
+        tts?.shutdown()
+        (web.parent as? ViewGroup)?.removeView(web)
+        web.destroy()
+        super.onDestroy()
+    }
+
+    // Web 側からは window.HiitNative として呼ぶ（js/audio.js・js/views/history.js）。呼ばれるのは WebView の別スレッド
+    inner class Bridge {
+        @JavascriptInterface
+        fun speak(text: String) = runOnUiThread { say(text) }
+
+        @JavascriptInterface
+        fun stopSpeaking() {
+            tts?.stop()
+        }
+
+        @JavascriptInterface
+        fun keepScreenOn(on: Boolean) = runOnUiThread {
+            if (on) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+
+        // navigator.vibrate と同じ形（"200" や "[100,80,100]" = 振動, 休み, 振動…）
+        @JavascriptInterface
+        fun vibrate(pattern: String) {
+            val ms = pattern.trim('[', ']', ' ').split(',').mapNotNull { it.trim().toLongOrNull() }
+            if (ms.isEmpty()) return
+            val vibrator = if (Build.VERSION.SDK_INT >= 31) {
+                getSystemService(VibratorManager::class.java).defaultVibrator
+            } else {
+                @Suppress("DEPRECATION")
+                getSystemService(Vibrator::class.java)
+            }
+            // Android の波形は「休み, 振動, 休み…」の順なので先頭に 0 を足す
+            vibrator.vibrate(VibrationEffect.createWaveform((listOf(0L) + ms).toLongArray(), -1))
+        }
+
+        @JavascriptInterface
+        fun saveFile(name: String, text: String) = runOnUiThread {
+            pendingExport = text
+            val intent = Intent(Intent.ACTION_CREATE_DOCUMENT)
+                .addCategory(Intent.CATEGORY_OPENABLE)
+                .setType("application/json")
+                .putExtra(Intent.EXTRA_TITLE, name)
+            try {
+                startActivityForResult(intent, REQ_SAVE)
+            } catch (_: ActivityNotFoundException) {
+                pendingExport = null
+                Toast.makeText(this@MainActivity, "保存先を選ぶ画面を開けません", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private companion object {
+        const val TAG = "HiitWeekly"
+        const val START_URL = "https://${WebViewAssetLoader.DEFAULT_DOMAIN}/assets/index.html"
+        const val REQ_OPEN = 1
+        const val REQ_SAVE = 2
+    }
+}

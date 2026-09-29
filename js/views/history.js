@@ -141,7 +141,7 @@ export function settingsView() {
 
       <div class="card section">
         <h2 style="font-size:16px;margin-bottom:10px">データ</h2>
-        <p class="small muted" style="margin:0 0 10px">記録・自作メニュー・動画URLはこの端末のブラウザに保存されます。機種変更のときはバックアップを使ってください。</p>
+        <p class="small muted" style="margin:0 0 10px">記録・自作メニュー・動画URLはこの端末に保存されます。機種変更のときはバックアップを使ってください。</p>
         <div class="btn-row">
           <button class="btn" data-act="export">バックアップを保存</button>
           <label class="btn">読み込む<input type="file" accept="application/json,.json" data-import hidden></label>
@@ -165,10 +165,14 @@ export function settingsView() {
           speak('レスト。次は、スクワット', state.settings.voice);
           if (!state.settings.sound && !state.settings.voice) toast('ビープ音と音声ガイドがオフになっています');
         } else if (act === 'export') {
-          const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+          const json = JSON.stringify(state, null, 2);
+          const name = `hiit-weekly-${dayKey()}.json`;
+          // Android アプリ版はダウンロードが使えないので、保存先を選ぶ画面を出す
+          if (window.HiitNative) return window.HiitNative.saveFile(name, json);
+          const blob = new Blob([json], { type: 'application/json' });
           const a = document.createElement('a');
           a.href = URL.createObjectURL(blob);
-          a.download = `hiit-weekly-${dayKey()}.json`;
+          a.download = name;
           a.click();
           setTimeout(() => URL.revokeObjectURL(a.href), 1000);
         } else if (act === 'reset') {

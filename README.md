@@ -22,6 +22,27 @@
 
 > 記録・自作メニュー・動画URLは端末のブラウザ内（localStorage）に保存されます。機種変更時は「設定 → バックアップを保存／読み込む」を使ってください。
 
+## Android アプリ（APK）として使う
+
+`android/` は、この Web アプリを APK に同梱して表示する Android アプリです（公開サーバー不要・オフラインで動く）。
+Web 版のファイル（index.html・css・js・icons）はビルド時にコピーされるので、アプリだけのために二重に直す必要はありません。
+WebView に無い「音声ガイド・画面スリープ防止・バックアップの保存／読み込み」は Android 側の機能を使います（`window.HiitNative`）。
+
+```bash
+cd android
+# JDK は Android Studio 同梱のものを使う（Git Bash の例）
+export JAVA_HOME="/c/Program Files/Android/Android Studio/jbr"
+./gradlew assembleDebug    # → app/build/outputs/apk/debug/app-debug.apk
+```
+
+スマホへの入れ方（どちらか）：
+
+- **USB**：スマホの開発者向けオプションで USB デバッグを有効にし、`adb install -r app/build/outputs/apk/debug/app-debug.apk`
+- **ファイルを送る**：APK を Google ドライブなどに置き、スマホで開いてインストール（「提供元不明のアプリ」の許可が必要）
+
+> アプリ版のデータは Web 版（ブラウザ）とは別に保存されます。移すときは「設定 → バックアップを保存／読み込む」。
+> APK はこのPCのデバッグ用の鍵で署名されます。別のPCでビルドした APK は上書きインストールできず、入れ直すとデータが消えるので、先にバックアップを取ってください。
+
 ## 公開のしかた（GitHub Pages）
 
 ビルド不要の静的サイトなので、リポジトリのルートをそのまま公開できます。
@@ -65,6 +86,7 @@ dev/poses.html          開発用：全種目のポーズを一覧表示
 scripts/                開発サーバー（serve.mjs）とブラウザ通し確認（smoke.mjs）
 tests/                  node:test によるテスト
 CLAUDE.md               開発ルールと引き継ぎメモ（Claude Code 用）
+android/                Android アプリ版（WebView で上のファイルを表示する入れ物）
 ```
 
 ## 種目を追加するには
@@ -80,3 +102,9 @@ CLAUDE.md               開発ルールと引き継ぎメモ（Claude Code 用�
 ## 注意
 
 HIITは強度の高い運動です。体調に合わせて無理のない範囲で行い、持病のある方は医師に相談してください。
+
+## テスト時間の記録
+
+| 日付 | 内容 | 件数 | 所要時間 |
+| --- | --- | --- | --- |
+| 2026-09-30 | `npm run check`（test＋lint） | 19件 | 4.9秒 |

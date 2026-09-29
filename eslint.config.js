@@ -18,7 +18,7 @@ const rules = {
 };
 
 export default [
-  { ignores: ['node_modules/', '.screenshots/'] },
+  { ignores: ['node_modules/', '.screenshots/', 'android/'] },
   { files: ['js/**/*.js', 'dev/**/*.js'], languageOptions: { ecmaVersion: 2024, sourceType: 'module', globals: browser }, rules },
   { files: ['sw.js'], languageOptions: { ecmaVersion: 2024, sourceType: 'script', globals: worker }, rules },
   { files: ['tests/**/*.js', 'eslint.config.js'], languageOptions: { ecmaVersion: 2024, sourceType: 'module', globals: node }, rules },

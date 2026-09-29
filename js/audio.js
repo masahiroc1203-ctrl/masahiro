@@ -1,6 +1,8 @@
 // 効果音・音声ガイド・バイブ
 let ctx = null;
 let voice = null;
+// Android アプリ版（android/）では WebView に無い読み上げ・スリープ防止をアプリ側の機能で行う
+const native = window.HiitNative;
 
 // iOS では最初のタップ中に音声系を有効化しておく必要がある
 export function unlockAudio() {
@@ -68,6 +70,7 @@ export function play(name, enabled = true) {
 }
 
 export function speak(text, enabled = true) {
+  if (enabled && native) return native.speak(text);
   if (!enabled || !('speechSynthesis' in window)) return;
   try {
     const s = window.speechSynthesis;
@@ -84,6 +87,7 @@ export function speak(text, enabled = true) {
 
 export function stopSpeech() {
   try {
+    native?.stopSpeaking();
     window.speechSynthesis?.cancel();
   } catch {
     // noop
@@ -91,6 +95,7 @@ export function stopSpeech() {
 }
 
 export function buzz(pattern, enabled = true) {
+  if (enabled && native) return native.vibrate(JSON.stringify(pattern));
   if (enabled && navigator.vibrate) {
     try {
       navigator.vibrate(pattern);
@@ -103,6 +108,7 @@ export function buzz(pattern, enabled = true) {
 // 画面スリープ防止
 let lock = null;
 export async function keepAwake(on) {
+  if (native) return native.keepScreenOn(!!on);
   try {
     if (on && 'wakeLock' in navigator) {
       if (!lock || lock.released) lock = await navigator.wakeLock.request('screen');
