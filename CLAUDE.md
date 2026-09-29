@@ -80,7 +80,7 @@ dev/poses.html           ポーズ確認ページ
 - [x] ✅ 画面：ホーム（今週の部位・実施日）/ メニュー一覧・詳細（時間調整）・作成 / 種目一覧・詳細 / 記録 / 設定
 - [x] ✅ 動画URL登録（`js/video.js`）とワークアウト中の動画⇄アニメ切替、YouTube検索ボタン
 - [x] ✅ PWA（manifest・`sw.js`・アイコン）、ライト/ダーク
-- [x] ✅ テスト19件・lint・ブラウザ通し確認（`npm run smoke` 23項目）・CI（`.github/workflows/ci.yml`）
+- [x] ✅ テスト19件・lint・ブラウザ通し確認（`npm run smoke` 24項目）・CI（`.github/workflows/ci.yml`）
 - [ ] PR #12 を確認してマージ
 - [ ] GitHub Pages を有効化し、iPhone / Android の実機で確認：ビープ音・音声・バイブ・画面スリープ防止・ホーム画面追加・オフライン起動
 - [ ] 実機で分かりにくい種目のアニメがあればキーフレームを調整（`/dev/poses.html`）
