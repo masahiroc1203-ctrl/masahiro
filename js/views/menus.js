@@ -15,7 +15,7 @@ import {
   weekKey,
   uid,
 } from '../store.js';
-import { $, $$, esc, icon, partTag, levelDots, figSlot, mountFigures, stepperHtml, bindSteppers, toast } from '../ui.js';
+import { $, $$, esc, icon, partTag, levelDots, figSlot, mountFigures, stepperHtml, bindSteppers, toast, confirmSheet } from '../ui.js';
 
 const intervals = (m) => m.exercises.length * m.laps;
 export const timingText = (m) => `${m.work}秒運動・${m.rest}秒休憩 × ${intervals(m)}本`;
@@ -178,13 +178,13 @@ export function menuView({ id }) {
           }
         });
       bind();
-      root.addEventListener('click', (e) => {
+      root.addEventListener('click', async (e) => {
         const act = e.target.closest('[data-act]')?.dataset.act;
         if (act === 'start') ctx.startWorkout(getMenu(id));
         else if (act === 'reset') {
           resetTiming(id);
           ctx.rerender();
-        } else if (act === 'delete' && window.confirm(`「${m.name}」を削除しますか？`)) {
+        } else if (act === 'delete' && (await confirmSheet(`「${m.name}」を削除しますか？`, { ok: '削除する', danger: true }))) {
           deleteCustomMenu(id);
           toast('削除しました');
           ctx.navigate('#/menus', { replace: true });

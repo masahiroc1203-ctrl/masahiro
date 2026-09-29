@@ -141,13 +141,17 @@ export function toast(msg) {
 }
 
 // ───── ボトムシート ─────
-export function openSheet(html, onMount) {
+export function openSheet(html, onMount, onClose) {
   const backdrop = document.createElement('div');
   backdrop.className = 'sheet-backdrop';
   backdrop.innerHTML = `<div class="sheet" role="dialog" aria-modal="true"><div class="grabber"></div>${html}</div>`;
+  let open = true;
   const close = () => {
+    if (!open) return;
+    open = false;
     backdrop.remove();
     document.removeEventListener('keydown', onKey);
+    onClose?.();
   };
   const onKey = (e) => e.key === 'Escape' && close();
   backdrop.addEventListener('click', (e) => e.target === backdrop && close());
@@ -155,4 +159,29 @@ export function openSheet(html, onMount) {
   document.body.append(backdrop);
   onMount?.($('.sheet', backdrop), close);
   return close;
+}
+
+// 確認ダイアログ（ブラウザ標準の confirm の代わり）。OKなら true を返す
+export function confirmSheet(message, { detail = '', ok = 'OK', cancel = 'キャンセル', danger = false } = {}) {
+  return new Promise((resolve) => {
+    let result = false;
+    openSheet(
+      `<h2>${esc(message)}</h2>
+       ${detail ? `<p class="muted small" style="margin:4px 0 0">${esc(detail)}</p>` : ''}
+       <div class="btn-row" style="margin-top:18px">
+         <button class="btn" data-cancel>${esc(cancel)}</button>
+         <button class="btn ${danger ? 'btn-danger-fill' : 'btn-primary'}" data-ok>${esc(ok)}</button>
+       </div>`,
+      (sheet, close) => {
+        const okBtn = $('[data-ok]', sheet);
+        okBtn.addEventListener('click', () => {
+          result = true;
+          close();
+        });
+        $('[data-cancel]', sheet).addEventListener('click', close);
+        okBtn.focus();
+      },
+      () => resolve(result),
+    );
+  });
 }

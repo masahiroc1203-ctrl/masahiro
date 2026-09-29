@@ -4,7 +4,7 @@ import { buildTimeline, Session, PHASE_LABEL, formatClock, formatMinutes } from 
 import { createFigure } from './figure.js';
 import { play, speak, stopSpeech, buzz, keepAwake } from './audio.js';
 import { state, addLog, dayKey, weekKey, logsInWeek, uid, videoFor, setSetting } from './store.js';
-import { $, esc, icon, partTag, spokenName, videoEmbedHtml } from './ui.js';
+import { $, esc, icon, partTag, spokenName, videoEmbedHtml, confirmSheet } from './ui.js';
 
 let current = null; // 開いているプレイヤー（同時に1つだけ）
 
@@ -275,11 +275,21 @@ export function openPlayer(menu, { onClose } = {}) {
   }
 
   // 閉じる前の確認。途中まででも10秒以上やっていれば記録する
-  function requestClose() {
+  let confirming = false;
+  async function requestClose() {
     if (session.finished) return close();
+    if (confirming) return;
+    confirming = true;
     const wasPaused = session.paused;
     setPaused(true);
-    if (window.confirm('ワークアウトを終了しますか？\n（ここまでの運動は記録されます）')) {
+    const ok = await confirmSheet('ワークアウトを終了しますか？', {
+      detail: 'ここまでの運動は記録されます。',
+      ok: '終了する',
+      cancel: '続ける',
+    });
+    confirming = false;
+    if (closed) return;
+    if (ok) {
       const entry = saveLog(false);
       close(entry ? 'saved' : null);
     } else if (!wasPaused) {

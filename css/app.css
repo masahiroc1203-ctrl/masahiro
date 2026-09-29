@@ -264,6 +264,11 @@ svg.icon {
 .btn-danger {
   color: #d93a3a;
 }
+.btn-danger-fill {
+  background: #d93a3a;
+  border-color: #d93a3a;
+  color: #fff;
+}
 .btn-block {
   display: flex;
   width: 100%;
@@ -969,7 +974,7 @@ ul.tips {
 .sheet-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 50;
+  z-index: 150;
   background: rgba(8, 10, 16, 0.45);
   display: flex;
   align-items: flex-end;
@@ -1370,12 +1375,12 @@ ul.tips {
   font-size: 11px;
   opacity: 0.8;
 }
-.player .btn {
+.player .p-done .btn {
   border-color: rgba(255, 255, 255, 0.3);
   background: rgba(255, 255, 255, 0.1);
   color: #fff;
 }
-.player .btn-primary {
+.player .p-done .btn-primary {
   background: var(--accent);
   border-color: var(--accent);
 }

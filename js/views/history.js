@@ -14,7 +14,7 @@ import {
   resetAll,
 } from '../store.js';
 import { play, speak, unlockAudio, buzz } from '../audio.js';
-import { $, $$, esc, icon, partTag, stepperHtml, bindSteppers, toast } from '../ui.js';
+import { $, $$, esc, icon, partTag, stepperHtml, bindSteppers, toast, confirmSheet } from '../ui.js';
 
 export function historyView() {
   const wk = weekKey();
@@ -90,8 +90,8 @@ export function historyView() {
       </section>`,
     mount(root, ctx) {
       for (const b of $$('[data-del]', root)) {
-        b.addEventListener('click', () => {
-          if (!window.confirm('この記録を削除しますか？')) return;
+        b.addEventListener('click', async () => {
+          if (!(await confirmSheet('この記録を削除しますか？', { ok: '削除する', danger: true }))) return;
           deleteLog(b.dataset.del);
           ctx.rerender();
         });
@@ -155,7 +155,7 @@ export function settingsView() {
       for (const input of $$('[data-switch]', root)) {
         input.addEventListener('change', () => setSetting(input.dataset.switch, input.checked));
       }
-      root.addEventListener('click', (e) => {
+      root.addEventListener('click', async (e) => {
         const act = e.target.closest('[data-act]')?.dataset.act;
         if (act === 'test') {
           unlockAudio();
@@ -172,7 +172,12 @@ export function settingsView() {
           a.click();
           setTimeout(() => URL.revokeObjectURL(a.href), 1000);
         } else if (act === 'reset') {
-          if (window.confirm('記録・自作メニュー・設定をすべて消去します。よろしいですか？')) {
+          const ok = await confirmSheet('すべてのデータを消去しますか？', {
+            detail: '記録・自作メニュー・動画URL・設定が消えます。元に戻せません。',
+            ok: '消去する',
+            danger: true,
+          });
+          if (ok) {
             resetAll();
             toast('消去しました');
             ctx.rerender();
@@ -185,7 +190,8 @@ export function settingsView() {
         try {
           const data = JSON.parse(await file.text());
           if (!data || typeof data !== 'object' || !Array.isArray(data.logs)) throw new Error('format');
-          if (!window.confirm('バックアップを読み込みます。今のデータは置き換わります。よろしいですか？')) return;
+          const ok = await confirmSheet('バックアップを読み込みますか？', { detail: '今のデータは置き換わります。', ok: '読み込む' });
+          if (!ok) return;
           for (const key of ['weeks', 'logs', 'custom', 'overrides', 'videos']) if (data[key]) state[key] = data[key];
           if (data.settings) Object.assign(state.settings, data.settings);
           save();
