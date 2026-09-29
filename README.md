@@ -30,15 +30,20 @@
 2. **Build and deployment → Source** を「Deploy from a branch」、Branch を `main` / `/(root)` にして Save
 3. 数分後に `https://masahiroc1203-ctrl.github.io/masahiro/` で開けます
 
-## パソコンで動かす
+## パソコンで動かす・続きを開発する
 
 ```bash
-npm start          # = python3 -m http.server 8080
-# → http://localhost:8080 を開く
-npm test           # ロジックのテスト（Node.js 18以上）
+git clone https://github.com/masahiroc1203-ctrl/masahiro.git
+cd masahiro
+npm start          # http://localhost:8080 を開く（依存インストール不要・Node.js 20以上）
+npm run check      # テスト＋lint
+npm run smoke      # ブラウザで通し確認（初回のみ: npm i -D playwright && npx playwright install chromium）
 ```
 
-ES Modules を使っているため、`index.html` を直接ダブルクリックではなく、上記のようにローカルサーバー経由で開いてください。
+ES Modules を使っているため、`index.html` を直接ダブルクリックではなく、上記のように開発サーバー経由で開いてください。
+同じWi-FiのスマホからPCのIPアドレス（例 `http://192.168.0.10:8080`）で開けば実機でも確認できます（画面スリープ防止とオフライン対応は https の公開URL か localhost でのみ動きます）。
+
+**Claude Code で続きを作業する場合**：開発ルール・設計判断・現在の進み具合は [`CLAUDE.md`](CLAUDE.md) にまとめてあります。`claude` を起動して `/start` で再開、作業の区切りで `/done` を実行すると `CLAUDE.md` の Handoff 欄が更新されます。
 
 ## ファイル構成
 
@@ -57,7 +62,9 @@ js/data/exercises.js    種目データ（説明文とアニメのキーフレ�
 js/data/menus.js        プリセットメニュー
 sw.js                   オフライン用サービスワーカー
 dev/poses.html          開発用：全種目のポーズを一覧表示
+scripts/                開発サーバー（serve.mjs）とブラウザ通し確認（smoke.mjs）
 tests/                  node:test によるテスト
+CLAUDE.md               開発ルールと引き継ぎメモ（Claude Code 用）
 ```
 
 ## 種目を追加するには
@@ -68,7 +75,7 @@ tests/                  node:test によるテスト
 - `t` … 胴体の向き（0=真下, 90=右, 180=真上）
 - `a1`/`a2`（腕）, `l1`/`l2`（脚） … `[上側の角度, 下側の角度]`、または `at(x, y)` で手先・足先の位置を指定（IKで肘・膝を自動計算）
 
-を書きます。`http://localhost:8080/dev/poses.html?ids=新しいID` で動きを確認し、`npm test` でデータの整合性（床へのめり込み等）をチェックできます。
+を書きます。`npm start` のあと `http://localhost:8080/dev/poses.html?ids=新しいID` で動きを確認し、`npm test` でデータの整合性（床へのめり込み等）をチェックできます。
 
 ## 注意
 
