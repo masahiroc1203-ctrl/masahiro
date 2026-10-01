@@ -1,0 +1,4 @@
+# gradlew はシェルスクリプトなので CRLF にすると Git Bash や Linux で動かない
+gradlew text eol=lf
+*.bat text eol=crlf
+*.jar binary

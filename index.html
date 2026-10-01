@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>HIIT Weekly</title>
+    <meta name="description" content="週ごとに強化する部位を決めて、お手本アニメを見ながらタバタ式HIITができるアプリ" />
+    <meta name="theme-color" content="#f4f5f9" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0d0f14" media="(prefers-color-scheme: dark)" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="HIIT Weekly" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+    <link rel="stylesheet" href="css/app.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar" id="topbar"></header>
+      <main id="view" class="view"></main>
+    </div>
+
+    <nav class="tabbar" aria-label="メイン">
+      <div class="tabbar-inner">
+        <a class="tab" data-tab="home" href="#/">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-8 9 8" /><path d="M5 10v10h5v-6h4v6h5V10" /></svg>
+          ホーム
+        </a>
+        <a class="tab" data-tab="menus" href="#/menus">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11" /><path d="M4 6h.01M4 12h.01M4 18h.01" stroke-width="3" /></svg>
+          メニュー
+        </a>
+        <a class="tab" data-tab="exercises" href="#/exercises">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="4.5" r="2" /><path d="M12 7v7M7 10.5l5-2 5 2M8.5 21l3.5-7 3.5 7" /></svg>
+          種目
+        </a>
+        <a class="tab" data-tab="history" href="#/history">
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21h18" /><path d="M6 17v-5M11 17V6M16 17v-8M21 17v-3" /></svg>
+          記録
+        </a>
+      </div>
+    </nav>
+
+    <noscript><p style="padding: 16px">このアプリを使うには JavaScript を有効にしてください。</p></noscript>
+    <script type="module" src="js/app.js"></script>
+  </body>
+</html>

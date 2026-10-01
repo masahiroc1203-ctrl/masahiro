@@ -1,0 +1,17 @@
+{
+  "name": "hiit-weekly",
+  "version": "1.0.0",
+  "private": true,
+  "description": "週ごとに強化する部位を決めて、お手本アニメを見ながらタバタ式HIITができるWebアプリ",
+  "type": "module",
+  "scripts": {
+    "start": "node scripts/serve.mjs",
+    "test": "node --test",
+    "lint": "npx --yes eslint@9 .",
+    "smoke": "node scripts/smoke.mjs",
+    "check": "npm test && npm run lint"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

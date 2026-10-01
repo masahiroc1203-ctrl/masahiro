@@ -1,0 +1,16 @@
+# --- Gradle / ビルド生成物 ---
+.gradle/
+.kotlin/
+build/
+local.properties
+*.apk
+
+# --- Android Studio ---
+.idea/
+*.iml
+captures/
+
+# --- 署名鍵（絶対にコミットしない）---
+*.jks
+*.keystore
+keystore.properties
