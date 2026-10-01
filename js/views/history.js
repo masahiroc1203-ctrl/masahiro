@@ -103,6 +103,8 @@ export function historyView() {
 const SETTING_SPEC = {
   prep: { min: 0, max: 30, step: 5, fmt: (v) => (v ? `${v}秒` : 'なし') },
   goal: { min: 1, max: 7, step: 1, fmt: (v) => `${v}回` },
+  soundVol: { min: 1, max: 5, step: 1, fmt: (v) => `${v} / 5` },
+  voiceVol: { min: 1, max: 5, step: 1, fmt: (v) => `${v} / 5` },
 };
 
 const sw = (key, label, note) => `
@@ -113,7 +115,8 @@ const sw = (key, label, note) => `
 
 export function settingsView() {
   const s = state.settings;
-  const standalone = window.matchMedia?.('(display-mode: standalone)').matches || navigator.standalone;
+  // すでにアプリとして開いている（ホーム画面から起動・Android アプリ版）なら、追加のしかたの案内は出さない
+  const standalone = window.matchMedia?.('(display-mode: standalone)').matches || navigator.standalone || window.HiitNative;
   return {
     title: '設定',
     back: '#/',
@@ -123,7 +126,9 @@ export function settingsView() {
           <div class="setting"><div class="label"><b>準備時間</b><small>スタート前のカウントダウン</small></div>${stepperHtml('prep', s.prep, SETTING_SPEC.prep.fmt)}</div>
           <div class="setting"><div class="label"><b>週の目標</b><small>ホームの進み具合に使います</small></div>${stepperHtml('goal', s.goal, SETTING_SPEC.goal.fmt)}</div>
           ${sw('sound', 'ビープ音', '3・2・1 のカウントと切り替え音')}
+          <div class="setting"><div class="label"><b>ビープ音の音量</b><small>変えると試しに鳴ります</small></div>${stepperHtml('soundVol', s.soundVol, SETTING_SPEC.soundVol.fmt)}</div>
           ${sw('voice', '音声ガイド', '「レスト。次は〇〇」などを読み上げ')}
+          <div class="setting"><div class="label"><b>音声ガイドの音量</b><small>5 が端末の音量いっぱい</small></div>${stepperHtml('voiceVol', s.voiceVol, SETTING_SPEC.voiceVol.fmt)}</div>
           ${sw('vibrate', 'バイブレーション', '対応している端末のみ（Androidなど）')}
           ${sw('videoFirst', '登録した動画を優先', '動画URLを登録した種目は、ワークアウト中に動画を表示')}
         </div>
@@ -150,8 +155,18 @@ export function settingsView() {
       </div>
       <p class="small muted" style="text-align:center;margin-top:18px">HIIT Weekly</p>`,
     mount(root, ctx) {
-      const values = { prep: s.prep, goal: s.goal };
-      bindSteppers(root, values, SETTING_SPEC, (name, v) => setSetting(name, v));
+      const values = { prep: s.prep, goal: s.goal, soundVol: s.soundVol, voiceVol: s.voiceVol };
+      bindSteppers(root, values, SETTING_SPEC, (name, v) => {
+        setSetting(name, v);
+        // 音量は変えたその場で鳴らして確かめられるようにする（スイッチがオフでも鳴らす）
+        if (name === 'soundVol') {
+          unlockAudio();
+          play('go', true, v);
+        } else if (name === 'voiceVol') {
+          unlockAudio();
+          speak('スタート', true, v);
+        }
+      });
       for (const input of $$('[data-switch]', root)) {
         input.addEventListener('change', () => setSetting(input.dataset.switch, input.checked));
       }
@@ -159,10 +174,10 @@ export function settingsView() {
         const act = e.target.closest('[data-act]')?.dataset.act;
         if (act === 'test') {
           unlockAudio();
-          play('tick', state.settings.sound);
-          setTimeout(() => play('go', state.settings.sound), 400);
+          play('tick', state.settings.sound, state.settings.soundVol);
+          setTimeout(() => play('go', state.settings.sound, state.settings.soundVol), 400);
           buzz(200, state.settings.vibrate);
-          speak('レスト。次は、スクワット', state.settings.voice);
+          speak('レスト。次は、スクワット', state.settings.voice, state.settings.voiceVol);
           if (!state.settings.sound && !state.settings.voice) toast('ビープ音と音声ガイドがオフになっています');
         } else if (act === 'export') {
           const json = JSON.stringify(state, null, 2);

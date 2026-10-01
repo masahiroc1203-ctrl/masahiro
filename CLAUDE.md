@@ -88,6 +88,7 @@ dev/poses.html           ポーズ確認ページ
 - [x] ✅ PWA（manifest・`sw.js`・アイコン）、ライト/ダーク
 - [x] ✅ テスト19件・lint・ブラウザ通し確認（`npm run smoke` 24項目）・CI（`.github/workflows/ci.yml`）
 - [x] ✅ お手本アニメを棒人間から人物の絵に変更（2026-10-02。体の厚み・服・手足の先・首の向き。35種目のデータは変更なし）
+- [x] ✅ ビープ音・音声ガイドの音量を設定で5段階に（2026-10-02。`store.js` の `beepGain` / `voiceGain`。ビープは 3 が元の大きさ・初期値 4・5 が歪まない上限）
 - [x] ✅ Android アプリ版（`android/`）：WebView＋`HiitNative`（読み上げ・バイブ・スリープ防止・バックアップ保存/読込）、戻るボタン、外部リンク、ダーク。Pixel_6 エミュレータ（Android 17）で確認済み
 - [ ] APK を実機に入れて確認：ビープ音・音声（日本語の読み上げ）・バイブ・画面スリープ防止・YouTube/mp4 動画の埋め込み再生
 - [ ] PR #12 の扱い（説明文の更新・マージ）と、リポジトリを public のままにするかを決める
@@ -113,9 +114,11 @@ dev/poses.html           ポーズ確認ページ
 - **Android 版の注意**（エミュレータで実測）
   - 一番上の画面で戻るを押すと終了せず `moveTaskToBack`。Activity を終了させると、その後の `onTrimMemory` で WebView（145）内部が SIGILL で落ちるため（毎回再現。裏に回すだけなら落ちない）
   - システムバーの余白はアプリ側で付け、WebView には渡さない（渡すと CSS の `env(safe-area-inset-*)` と二重になる）
+  - 音はすべてメディア音量で鳴る（`volumeControlStream = STREAM_MUSIC`）。読み上げの音量は `HiitNative.speak(text, 0〜1)` で渡す。音声は端末の音量より大きくはできない
   - テーマ色の変更（`CONFIG_ASSETS_PATHS`）では Activity が作り直される。`restoreState` できないときは最初のページを読む
   - 動作確認は、デバッグ版の WebView に Chrome DevTools Protocol でつなぐと楽（`adb forward tcp:9222 localabstract:webview_devtools_remote_<pid>`）。エミュレータは `emulator -avd Pixel_6 -no-window`、adb には `MSYS_NO_PATHCONV=1`
 
 ### 未解決事項（CLIで判断が必要）
 - 次回最初にやること：実機での APK の確認結果を聞き、不具合があれば直す
+- 音量を上げても聞き取りにくい場合の候補：ビープ音の音色を変える（倍音を足す）、合図の間だけ他アプリの音楽を下げる（Android のオーディオフォーカス）
 - 検討候補（未決定・ユーザーと相談）：曜日ごとの週間計画（例：月水金に何をやるか）、部位の自動ローテーション、ウォームアップ／クールダウンの自動追加、BGM、記録のカレンダー表示

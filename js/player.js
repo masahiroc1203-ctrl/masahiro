@@ -125,19 +125,19 @@ export function openPlayer(menu, { onClose } = {}) {
     if (!announce) return;
     const name = spokenName(ex);
     if (seg.type === 'prep') {
-      speak(`準備してください。最初は、${name}`, settings.voice);
+      speak(`準備してください。最初は、${name}`, settings.voice, settings.voiceVol);
     } else if (seg.type === 'work') {
-      play('go', settings.sound);
+      play('go', settings.sound, settings.soundVol);
       buzz(250, settings.vibrate);
-      speak(w.index === w.total ? 'ラスト、スタート' : 'スタート', settings.voice);
+      speak(w.index === w.total ? 'ラスト、スタート' : 'スタート', settings.voice, settings.voiceVol);
     } else if (seg.type === 'rest') {
-      play('rest', settings.sound);
+      play('rest', settings.sound, settings.soundVol);
       buzz([100, 80, 100], settings.vibrate);
-      speak(`レスト。次は、${name}`, settings.voice);
+      speak(`レスト。次は、${name}`, settings.voice, settings.voiceVol);
     } else if (seg.type === 'lapRest') {
-      play('rest', settings.sound);
+      play('rest', settings.sound, settings.soundVol);
       buzz([100, 80, 100], settings.vibrate);
-      speak(`${seg.lap + 1}周目おわり。${seg.dur}秒休憩。次は、${name}`, settings.voice);
+      speak(`${seg.lap + 1}周目おわり。${seg.dur}秒休憩。次は、${name}`, settings.voice, settings.voiceVol);
     }
   }
 
@@ -150,15 +150,15 @@ export function openPlayer(menu, { onClose } = {}) {
     ui.remain.textContent = `残り ${formatClock(session.totalDuration - session.totalElapsed(now))}`;
     // カウントダウン音 3・2・1
     if (sec !== lastSec) {
-      if (lastSec !== null && sec <= 3 && sec >= 1 && !session.paused) play('tick', settings.sound);
+      if (lastSec !== null && sec <= 3 && sec >= 1 && !session.paused) play('tick', settings.sound, settings.soundVol);
       lastSec = sec;
     }
     // 左右入れ替え種目は半分でお知らせ
     if (seg.type === 'work' && exOf(seg).lr === 'switch' && !halfDone && remain <= seg.dur / 2) {
       halfDone = true;
-      play('half', settings.sound);
+      play('half', settings.sound, settings.soundVol);
       buzz([60, 60, 60], settings.vibrate);
-      speak('反対側', settings.voice);
+      speak('反対側', settings.voice, settings.voiceVol);
     }
     // 進捗バー
     const w = workAt[session.i];
@@ -236,9 +236,9 @@ export function openPlayer(menu, { onClose } = {}) {
     fig?.destroy();
     fig = null;
     const entry = saveLog(true);
-    play('done', settings.sound);
+    play('done', settings.sound, settings.soundVol);
     buzz([200, 100, 200, 100, 400], settings.vibrate);
-    speak('おつかれさまでした！', settings.voice);
+    speak('おつかれさまでした！', settings.voice, settings.voiceVol);
     keepAwake(false);
     const weekCount = logsInWeek(state.logs, weekKey()).length;
     ui.bars.forEach((b) => b.classList.add('done'));

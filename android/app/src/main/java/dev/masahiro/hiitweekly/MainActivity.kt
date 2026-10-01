@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.ApplicationInfo
+import android.media.AudioManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -33,12 +34,14 @@ class MainActivity : Activity() {
     private lateinit var web: WebView
     private var tts: TextToSpeech? = null
     private var ttsReady = false
-    private var pendingSpeech: String? = null
+    private var pendingSpeech: Pair<String, Float>? = null
     private var fileCallback: ValueCallback<Array<Uri>>? = null
     private var pendingExport: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // 端末の音量ボタンが、いつでもこのアプリの音（メディア音量）に効くようにする
+        volumeControlStream = AudioManager.STREAM_MUSIC
         val loader = WebViewAssetLoader.Builder()
             .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this))
             .build()
@@ -112,7 +115,7 @@ class MainActivity : Activity() {
                 val lang = tts?.setLanguage(Locale.JAPAN)
                 Log.i(TAG, "TTS ja-JP: $lang")
                 tts?.setSpeechRate(1.05f)
-                pendingSpeech?.let { say(it) }
+                pendingSpeech?.let { say(it.first, it.second) }
             }
         }
 
@@ -133,14 +136,16 @@ class MainActivity : Activity() {
     @Deprecated("Android 12 以前だけで使う")
     override fun onBackPressed() = back()
 
-    private fun say(text: String) {
+    // volume は 0〜1（端末のメディア音量に対する割合）
+    private fun say(text: String, volume: Float) {
         if (!ttsReady) {
-            pendingSpeech = text
+            pendingSpeech = text to volume
             return
         }
         pendingSpeech = null
-        Log.d(TAG, "speak: $text")
-        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "hiit")
+        Log.d(TAG, "speak: $text (volume $volume)")
+        val params = Bundle().apply { putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, volume.coerceIn(0f, 1f)) }
+        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, params, "hiit")
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -188,7 +193,7 @@ class MainActivity : Activity() {
     // Web 側からは window.HiitNative として呼ぶ（js/audio.js・js/views/history.js）。呼ばれるのは WebView の別スレッド
     inner class Bridge {
         @JavascriptInterface
-        fun speak(text: String) = runOnUiThread { say(text) }
+        fun speak(text: String, volume: Float) = runOnUiThread { say(text, volume) }
 
         @JavascriptInterface
         fun stopSpeaking() {

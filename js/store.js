@@ -7,11 +7,21 @@ const KEY = 'hiit-weekly:v1';
 export const DEFAULT_SETTINGS = {
   prep: 10, // 開始前の準備秒数
   sound: true, // ビープ音
+  soundVol: 4, // ビープ音の音量（1〜5）
   voice: true, // 音声ガイド
+  voiceVol: 5, // 音声ガイドの音量（1〜5）
   vibrate: true, // バイブ（対応端末のみ）
   goal: 3, // 週の目標回数
   videoFirst: true, // 動画を登録した種目は動画で表示
 };
+
+// 音量（1〜5）→ 倍率。ビープ音は 3 が最初の版の大きさで、5 が歪まない上限（一番大きい音の振幅が 1 になる）。
+// 音声は端末のメディア音量に対する割合なので、5 より大きくはできない
+const BEEP_GAIN = [0.35, 0.6, 1, 1.7, 2.85];
+const VOICE_GAIN = [0.25, 0.4, 0.6, 0.8, 1];
+const levelOf = (v, fallback) => Math.min(5, Math.max(1, Math.round(Number(v)) || fallback));
+export const beepGain = (v) => BEEP_GAIN[levelOf(v, DEFAULT_SETTINGS.soundVol) - 1];
+export const voiceGain = (v) => VOICE_GAIN[levelOf(v, DEFAULT_SETTINGS.voiceVol) - 1];
 
 const blank = () => ({
   settings: { ...DEFAULT_SETTINGS },

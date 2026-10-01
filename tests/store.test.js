@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { weekKey, addDays, dayKey, formatWeekRange, suggestParts, partBalance, logsInWeek } from '../js/store.js';
+import { weekKey, addDays, dayKey, formatWeekRange, suggestParts, partBalance, logsInWeek, beepGain, voiceGain, DEFAULT_SETTINGS } from '../js/store.js';
 import { parseVideo, youtubeEmbedUrl } from '../js/video.js';
 
 test('週は月曜はじまり', () => {
@@ -57,4 +57,20 @@ test('動画URLの解釈', () => {
   assert.match(url, /^https:\/\/www\.youtube-nocookie\.com\/embed\/dQw4w9WgXcQ\?/);
   assert.match(url, /mute=1/);
   assert.match(url, /playlist=dQw4w9WgXcQ/);
+});
+
+test('音量の段階（1〜5）が倍率になる', () => {
+  // ビープ音：3 が最初の版と同じ、段階を上げるほど大きく、5 でも一番大きい音（振幅 0.35）が 1 を超えない
+  assert.equal(beepGain(3), 1);
+  for (let v = 1; v < 5; v++) assert.ok(beepGain(v + 1) > beepGain(v), `beep ${v}`);
+  assert.ok(0.35 * beepGain(5) <= 1 && 0.35 * beepGain(5) > 0.95);
+  // 音声：5 が端末の音量いっぱい
+  assert.equal(voiceGain(5), 1);
+  for (let v = 1; v < 5; v++) assert.ok(voiceGain(v + 1) > voiceGain(v), `voice ${v}`);
+  // 範囲外・未設定（古い保存データ）は既定値や端の値になる
+  assert.equal(beepGain(undefined), beepGain(DEFAULT_SETTINGS.soundVol));
+  assert.equal(voiceGain(undefined), voiceGain(DEFAULT_SETTINGS.voiceVol));
+  assert.equal(beepGain(9), beepGain(5));
+  assert.equal(beepGain(-3), beepGain(1));
+  assert.ok(DEFAULT_SETTINGS.soundVol > 3, '初期値は最初の版より大きい');
 });

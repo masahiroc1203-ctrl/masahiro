@@ -1,5 +1,8 @@
 // 効果音・音声ガイド・バイブ
+import { beepGain, voiceGain } from './store.js';
+
 let ctx = null;
+let scale = 1; // いま鳴らす音の音量倍率（play() が設定する）
 let voice = null;
 // Android アプリ版（android/）では WebView に無い読み上げ・スリープ防止をアプリ側の機能で行う
 const native = window.HiitNative;
@@ -36,7 +39,7 @@ function tone(freq, dur, vol = 0.25, at = 0) {
   osc.type = 'sine';
   osc.frequency.value = freq || 440;
   gain.gain.setValueAtTime(0.0001, t0);
-  gain.gain.exponentialRampToValueAtTime(Math.max(vol, 0.0001), t0 + 0.01);
+  gain.gain.exponentialRampToValueAtTime(Math.min(1, Math.max(vol * scale, 0.0001)), t0 + 0.01);
   gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
   osc.connect(gain).connect(ctx.destination);
   osc.start(t0);
@@ -59,18 +62,19 @@ export const SOUNDS = {
   },
 };
 
-export function play(name, enabled = true) {
+export function play(name, enabled = true, level) {
   if (!enabled) return;
   try {
     if (ctx?.state === 'suspended') ctx.resume();
+    scale = beepGain(level);
     SOUNDS[name]?.();
   } catch {
     // 再生失敗は無視
   }
 }
 
-export function speak(text, enabled = true) {
-  if (enabled && native) return native.speak(text);
+export function speak(text, enabled = true, level) {
+  if (enabled && native) return native.speak(text, voiceGain(level));
   if (!enabled || !('speechSynthesis' in window)) return;
   try {
     const s = window.speechSynthesis;
@@ -79,6 +83,7 @@ export function speak(text, enabled = true) {
     u.lang = 'ja-JP';
     if (voice) u.voice = voice;
     u.rate = 1.05;
+    u.volume = voiceGain(level);
     s.speak(u);
   } catch {
     // 読み上げ非対応
