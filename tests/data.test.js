@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { EXERCISES, EXERCISE_BY_ID } from '../js/data/exercises.js';
 import { PRESET_MENUS } from '../js/data/menus.js';
 import { PARTS, LEVELS } from '../js/data/parts.js';
-import { frameAt, computeJoints, solveIK, LIMB_KEYS, VIEW, BODY } from '../js/pose.js';
+import { frameAt, computeJoints, solveIK, defaultNeck, LIMB_KEYS, VIEW, BODY } from '../js/pose.js';
 
 const partIds = new Set(PARTS.map((p) => p.id));
 
@@ -50,6 +50,38 @@ test('すべての種目のアニメが破綻しない（NaNなし・枠内・�
       assert.ok(j.head[1] + BODY.head <= VIEW.ground + 1.5, `${ex.id} 頭が床にめり込む`);
     }
   }
+});
+
+test('手とつま先が破綻しない（NaNなし・床にめり込まない・長さが決めたとおり）', () => {
+  for (const ex of EXERCISES) {
+    const footLen = ex.anim.view === 'front' ? BODY.foot * 0.6 : BODY.foot;
+    for (let i = 0; i < 60; i++) {
+      const j = frameAt(ex.anim, (ex.anim.ms * i) / 60);
+      for (const key of ['l1', 'l2']) {
+        const [x, y] = j.toes[key];
+        const ankle = j[key][2];
+        assert.ok(Number.isFinite(x) && Number.isFinite(y), `${ex.id} ${key} つま先 NaN`);
+        // 手足の末端そのものが床より少し下にある種目があるので、つま先はそれより下がらないことを見る
+        assert.ok(y <= Math.max(VIEW.ground - 2, ankle[1]) + 1e-6, `${ex.id} ${key} つま先 y=${y.toFixed(1)} が床より下`);
+        assert.ok(Math.hypot(x - ankle[0], y - ankle[1]) <= footLen + 1e-6, `${ex.id} ${key} 足が長すぎる`);
+      }
+      for (const key of ['a1', 'a2']) {
+        const [x, y] = j.hands[key];
+        const wrist = j[key][2];
+        assert.ok(Number.isFinite(x) && Number.isFinite(y), `${ex.id} ${key} 手 NaN`);
+        assert.ok(Math.abs(Math.hypot(x - wrist[0], y - wrist[1]) - BODY.hand) < 1e-6, `${ex.id} ${key} 手の位置`);
+      }
+    }
+  }
+});
+
+test('首の既定の角度：立って前傾したときは頭を倒しすぎず、寝た姿勢は胴体にそろえる', () => {
+  assert.equal(defaultNeck(180), 180);
+  assert.ok(defaultNeck(140) > 140 && defaultNeck(140) < 180, '前傾40度では胴体より起きている');
+  assert.equal(defaultNeck(116.5), 116.5, 'プランクは胴体と同じ');
+  assert.equal(defaultNeck(-90), -90, '仰向けは胴体と同じ');
+  // 角度を少しずつ変えても頭が急に跳ねない
+  for (let t = 90; t < 270; t++) assert.ok(Math.abs(defaultNeck(t + 1) - defaultNeck(t)) < 2.6, `t=${t}`);
 });
 
 test('IK指定の手足は目標位置に届く（届く距離の場合）', () => {

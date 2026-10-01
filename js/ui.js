@@ -46,7 +46,7 @@ export const levelDots = (lv) => `<span class="level" title="${LEVELS[lv]?.label
 // 読み上げ用の名前（カッコ書きを除く）
 export const spokenName = (ex) => ex.name.replace(/（.*?）/g, '');
 
-// ───── 棒人間の差し込み ─────
+// ───── お手本の人物の差し込み ─────
 // HTML内に <div data-fig="種目ID" data-mode="anim|thumb"></div> を置き、描画後に mountFigures を呼ぶ
 export const figSlot = (exId, mode = 'anim', cls = '') => `<div class="${cls}" data-fig="${esc(exId)}" data-mode="${mode}"></div>`;
 

@@ -1,4 +1,4 @@
-// 棒人間デモ用の骨格計算（DOM非依存・Nodeでテスト可能）
+// お手本の人物の骨格計算（DOM非依存・Nodeでテスト可能）
 //
 // 角度の約束: 0 = 真下, 90 = 右(前), 180 = 真上, -90 = 左(後ろ)。
 // 方向ベクトルは (sin θ, cos θ)（SVG座標なので y は下向きが正）。
@@ -17,6 +17,8 @@ export const BODY = {
   shin: 17,
   shoulderW: 5.5, // 正面ビューでの肩幅(片側)
   hipW: 3.5, // 正面ビューでの腰幅(片側)
+  foot: 5.5, // かかと(手足の末端)からつま先まで
+  hand: 1.6, // 手首から手の中心まで
 };
 
 const LIMBS = {
@@ -32,6 +34,57 @@ export const dir = (deg) => [Math.sin(deg * RAD), Math.cos(deg * RAD)];
 export const angleOf = (dx, dy) => Math.atan2(dx, dy) / RAD;
 const lerp = (a, b, e) => a + (b - a) * e;
 const ease = (x) => -(Math.cos(Math.PI * x) - 1) / 2;
+
+// 首の角度を省略したときの既定値。立った姿勢で上体を前に倒しても、人は顔を前に向けたままにするので、
+// 頭は胴体ほど倒さない。寝た姿勢・深く倒した姿勢（真上から60度以上）は胴体にそろえる
+export function defaultNeck(t) {
+  const lean = Math.abs(t - 180);
+  const w = Math.min(1, Math.max(0, (60 - lean) / 30)) * 0.45;
+  return t + (180 - t) * w;
+}
+
+const FLOOR = VIEW.ground - 2; // 床に接する関節の高さ（data/exercises.js の G と同じ）
+
+// つま先の位置。足はすねに直角で、膝が出ている側（体の前）を向く。床より下には行かず、床の上では床に沿う
+function toeOf([root, knee, ankle], view, outward) {
+  const sx = ankle[0] - knee[0];
+  const sy = ankle[1] - knee[1];
+  const sl = Math.hypot(sx, sy) || 1;
+  let nx;
+  let ny;
+  let len = BODY.foot;
+  if (view === 'front') {
+    // 正面ではつま先が手前を向くので、短く外向きに描く
+    nx = outward * 0.6;
+    ny = 0.8;
+    len *= 0.6;
+  } else {
+    const cross = (knee[0] - root[0]) * sy - (knee[1] - root[1]) * sx;
+    const s = cross < -1 ? -1 : 1;
+    nx = (sy / sl) * s;
+    ny = (-sx / sl) * s;
+    if (ankle[1] < FLOOR - 3) {
+      // 浮いている足は力が抜けてつま先が少し下がる
+      nx += (0.35 * sx) / sl;
+      ny += (0.35 * sy) / sl;
+      const nl = Math.hypot(nx, ny);
+      nx /= nl;
+      ny /= nl;
+    }
+  }
+  const toe = [ankle[0] + nx * len, ankle[1] + ny * len];
+  if (toe[1] <= FLOOR) return toe;
+  const dy = Math.max(0, FLOOR - ankle[1]);
+  const dx = Math.sqrt(Math.max(0, len * len - dy * dy));
+  return [ankle[0] + (nx >= 0 ? dx : -dx), ankle[1] + dy];
+}
+
+function handOf([, elbow, wrist]) {
+  const dx = wrist[0] - elbow[0];
+  const dy = wrist[1] - elbow[1];
+  const l = Math.hypot(dx, dy) || 1;
+  return [wrist[0] + (dx / l) * BODY.hand, wrist[1] + (dy / l) * BODY.hand];
+}
 
 // 2リンクIK。b の絶対値は横方向のふくらみ倍率（正面ビューの短縮表現に使う）
 export function solveIK(root, target, l1, l2, b) {
@@ -109,7 +162,7 @@ export function prepare(anim) {
   let p = prepared.get(anim);
   if (p) return p;
   const frames = anim.k.map((src) => {
-    const pose = { ...src, nk: src.nk ?? src.t };
+    const pose = { ...src, nk: src.nk ?? defaultNeck(src.t) };
     const joints = computeJoints(pose, anim.view);
     const ang = {};
     for (const key of LIMB_KEYS) ang[key] = limbAngles(joints[key]);
@@ -193,7 +246,7 @@ export function samplePose(anim, tMs) {
   return { pose: frames[0].pose, lift: 0 };
 }
 
-// 描画用：時刻 tMs の関節座標（ジャンプの持ち上げ込み）
+// 描画用：時刻 tMs の関節座標（ジャンプの持ち上げ込み）と、手・つま先の位置
 export function frameAt(anim, tMs) {
   const { pose, lift } = samplePose(anim, tMs);
   const j = computeJoints(pose, anim.view);
@@ -205,5 +258,7 @@ export function frameAt(anim, tMs) {
     for (const key of LIMB_KEYS) j[key] = j[key].map(up);
   }
   j.lift = lift;
+  j.hands = { a1: handOf(j.a1), a2: handOf(j.a2) };
+  j.toes = { l1: toeOf(j.l1, anim.view, 1), l2: toeOf(j.l2, anim.view, -1) };
   return j;
 }
