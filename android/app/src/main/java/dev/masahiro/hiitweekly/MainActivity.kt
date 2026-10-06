@@ -1,9 +1,11 @@
 package dev.masahiro.hiitweekly
 
+import android.Manifest
 import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.ApplicationInfo
+import android.content.pm.PackageManager
 import android.media.AudioManager
 import android.net.Uri
 import android.os.Build
@@ -26,10 +28,11 @@ import android.widget.FrameLayout
 import android.widget.Toast
 import android.window.OnBackInvokedDispatcher
 import androidx.webkit.WebViewAssetLoader
+import org.json.JSONObject
 import java.util.Locale
 
 // Web版（リポジトリ直下）を APK に同梱して WebView で表示するだけの入れ物。
-// WebView に無い機能（読み上げ・スリープ防止・ファイル保存）は Bridge で Web 側に渡す。
+// WebView に無い機能（読み上げ・スリープ防止・ファイル保存・心拍計）は Bridge で Web 側に渡す。
 class MainActivity : Activity() {
     private lateinit var web: WebView
     private var tts: TextToSpeech? = null
@@ -37,6 +40,39 @@ class MainActivity : Activity() {
     private var pendingSpeech: Pair<String, Float>? = null
     private var fileCallback: ValueCallback<Array<Uri>>? = null
     private var pendingExport: String? = null
+    private var pendingHeart: (() -> Unit)? = null // Bluetooth の許可が出たら実行すること
+    private val heart by lazy { HeartRate(this, ::heartEvent) }
+
+    // 心拍計からの知らせを Web 側（js/hr.js）へ渡す。Bluetooth のスレッドからも呼ばれる
+    private fun heartEvent(type: String, data: JSONObject) = runOnUiThread {
+        if (!isDestroyed) web.evaluateJavascript("window.__hiitHr&&window.__hiitHr('$type',$data)", null)
+    }
+
+    // 心拍計を使う前に、Bluetooth の許可と電源を確かめる。Android 11 以前は機器をさがすのに位置情報の許可が要る
+    private fun withBluetooth(action: () -> Unit) {
+        val wanted = if (Build.VERSION.SDK_INT >= 31) {
+            listOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT)
+        } else {
+            listOf(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+        val missing = wanted.filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
+        if (missing.isNotEmpty()) {
+            pendingHeart = action
+            requestPermissions(missing.toTypedArray(), REQ_BLUETOOTH)
+        } else if (!heart.ready) {
+            heartEvent("error", JSONObject().put("message", "Bluetooth をオンにしてください"))
+        } else {
+            action()
+        }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
+        if (requestCode != REQ_BLUETOOTH) return super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        val action = pendingHeart ?: return
+        pendingHeart = null
+        if (grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) withBluetooth(action)
+        else heartEvent("error", JSONObject().put("message", "心拍計を使うには Bluetooth の許可が必要です"))
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -184,6 +220,7 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        heart.release()
         tts?.shutdown()
         (web.parent as? ViewGroup)?.removeView(web)
         web.destroy()
@@ -235,6 +272,19 @@ class MainActivity : Activity() {
                 Toast.makeText(this@MainActivity, "保存先を選ぶ画面を開けません", Toast.LENGTH_SHORT).show()
             }
         }
+
+        // 心拍計（js/hr.js）。結果は window.__hiitHr に届く
+        @JavascriptInterface
+        fun hrScan() = runOnUiThread { withBluetooth { heart.scan() } }
+
+        @JavascriptInterface
+        fun hrStopScan() = runOnUiThread { heart.stopScan() }
+
+        @JavascriptInterface
+        fun hrConnect(address: String) = runOnUiThread { withBluetooth { heart.connect(address) } }
+
+        @JavascriptInterface
+        fun hrDisconnect() = runOnUiThread { heart.disconnect() }
     }
 
     private companion object {
@@ -242,5 +292,6 @@ class MainActivity : Activity() {
         const val START_URL = "https://${WebViewAssetLoader.DEFAULT_DOMAIN}/assets/index.html"
         const val REQ_OPEN = 1
         const val REQ_SAVE = 2
+        const val REQ_BLUETOOTH = 3
     }
 }

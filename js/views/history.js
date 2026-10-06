@@ -14,7 +14,8 @@ import {
   resetAll,
 } from '../store.js';
 import { play, speak, unlockAudio, buzz } from '../audio.js';
-import { $, $$, esc, icon, partTag, stepperHtml, bindSteppers, toast, confirmSheet } from '../ui.js';
+import { hr, hrAvailable, hrScan, hrStopScan, hrConnect, hrDisconnect, currentBpm, onHr } from '../hr.js';
+import { $, $$, esc, icon, partTag, stepperHtml, bindSteppers, toast, confirmSheet, openSheet } from '../ui.js';
 
 export function historyView() {
   const wk = weekKey();
@@ -113,6 +114,114 @@ const sw = (key, label, note) => `
     <label class="switch"><input type="checkbox" data-switch="${key}" ${state.settings[key] ? 'checked' : ''} aria-label="${label}"><span></span></label>
   </div>`;
 
+// 近くの機器の一覧から心拍計を選ぶ
+function openHrSheet(onPick) {
+  let off = () => {};
+  openSheet(
+    `<h2>心拍計をさがす</h2>
+     <p class="muted small" style="margin:4px 0 0">出てこないときは、バンドの「心拍数を共有」がオンになっているか確かめてください。</p>
+     <div class="part-options" data-list></div>
+     <div class="btn-row">
+       <button class="btn" data-rescan>もう一度さがす</button>
+       <button class="btn" data-cancel>閉じる</button>
+     </div>`,
+    (sheet, close) => {
+      const list = $('[data-list]', sheet);
+      let ran = false; // 実際にさがし始めたか（Bluetooth の許可を待っている間は「見つかりません」と出さない）
+      const paint = () => {
+        ran ||= hr.scanning;
+        const note = hr.scanning ? 'さがしています…' : ran && !hr.devices.length ? '見つかりませんでした' : '';
+        list.innerHTML =
+          hr.devices
+            .map((d) => `<button class="part-option" data-id="${esc(d.id)}"><span class="txt"><b>${esc(d.name)}</b>${d.hr ? '<small>心拍計</small>' : ''}</span></button>`)
+            .join('') + (note ? `<p class="muted small" style="margin:0;text-align:center">${note}</p>` : '');
+      };
+      off = onHr(paint);
+      list.addEventListener('click', (e) => {
+        const dev = hr.devices.find((d) => d.id === e.target.closest('[data-id]')?.dataset.id);
+        if (!dev) return;
+        close();
+        onPick(dev);
+      });
+      $('[data-rescan]', sheet).addEventListener('click', hrScan);
+      $('[data-cancel]', sheet).addEventListener('click', close);
+      hrScan();
+      paint();
+    },
+    () => {
+      off();
+      hrStopScan();
+    },
+  );
+}
+
+// 設定画面の「心拍計」。さがす → 選ぶ → 心拍数が届いたら登録する
+function mountHr(root) {
+  const box = $('[data-hr-status]', root);
+  const forget = $('[data-act="hr-forget"]', root);
+  let picked = null; // 選んだが、まだ心拍数が届いていない機器
+  const paint = () => {
+    const saved = state.settings.hrDevice;
+    forget.classList.toggle('hidden', !saved && hr.status === 'off');
+    forget.textContent = saved ? '登録を外す' : 'やめる';
+    if (hr.status === 'on') {
+      box.innerHTML = `<b>${esc(hr.name)}</b><span class="hr-now">${icon('heart')}<b class="num">${currentBpm() ?? '--'}</b>拍/分</span>`;
+    } else if (hr.status === 'connecting') {
+      box.innerHTML = `<b>${esc(hr.name)}</b><span class="muted small">つないでいます…</span>`;
+    } else if (saved) {
+      box.innerHTML = `<b>${esc(saved.name)}</b><button class="btn" data-act="hr-test">つないで確かめる</button>`;
+    } else {
+      box.innerHTML = '<span class="muted small">まだ登録していません</span>';
+    }
+  };
+  // この画面が描き直されて root が外れたら、登録したものを片づける
+  function stop() {
+    window.removeEventListener('hashchange', leave);
+    clearInterval(timer);
+    off();
+  }
+  // 画面を離れたら切る（ワークアウトでは player.js がつなぎ直す）
+  function leave() {
+    stop();
+    hrDisconnect();
+  }
+  const off = onHr((_, type) => {
+    if (!root.isConnected) return stop();
+    if (type === 'error') {
+      picked = null;
+      toast(hr.error);
+    } else if (type === 'data' && picked) {
+      setSetting('hrDevice', { id: picked.id, name: picked.name });
+      picked = null;
+      toast('心拍計を登録しました');
+    }
+    paint();
+  });
+  // 値が届かなくなったときに古い数字を出したままにしない
+  const timer = setInterval(() => {
+    if (!root.isConnected) stop();
+    else if (hr.status === 'on') paint();
+  }, 1000);
+  window.addEventListener('hashchange', leave);
+  root.addEventListener('click', (e) => {
+    const act = e.target.closest('[data-act]')?.dataset.act;
+    if (act === 'hr-scan') {
+      openHrSheet((dev) => {
+        picked = dev;
+        hrConnect(dev);
+      });
+    } else if (act === 'hr-test') {
+      hrConnect(state.settings.hrDevice);
+    } else if (act === 'hr-forget') {
+      picked = null;
+      setSetting('hrDevice', null);
+      hrDisconnect();
+      paint();
+    }
+  });
+  paint();
+}
+
 export function settingsView() {
   const s = state.settings;
   // すでにアプリとして開いている（ホーム画面から起動・Android アプリ版）なら、追加のしかたの案内は出さない
@@ -136,6 +245,20 @@ export function settingsView() {
       </div>
 
       ${
+        hrAvailable()
+          ? `<div class="card section">
+              <h2 style="font-size:16px;margin-bottom:6px">心拍計</h2>
+              <p class="small muted" style="margin:0 0 10px">Bluetooth の心拍計を登録すると、ワークアウト中に今の心拍数が出ます。Xiaomi Smart Band は、バンドの「設定 → 心拍数を共有」をオンにしてからさがしてください。</p>
+              <div class="hr-status" data-hr-status></div>
+              <div class="btn-row" style="margin-top:10px">
+                <button class="btn" data-act="hr-scan">${icon('heart')}心拍計をさがす</button>
+                <button class="btn" data-act="hr-forget"></button>
+              </div>
+            </div>`
+          : ''
+      }
+
+      ${
         standalone
           ? ''
           : `<div class="card section">
@@ -155,6 +278,7 @@ export function settingsView() {
       </div>
       <p class="small muted" style="text-align:center;margin-top:18px">HIIT Weekly</p>`,
     mount(root, ctx) {
+      if (hrAvailable()) mountHr(root);
       const values = { prep: s.prep, goal: s.goal, soundVol: s.soundVol, voiceVol: s.voiceVol };
       bindSteppers(root, values, SETTING_SPEC, (name, v) => {
         setSetting(name, v);

@@ -3,6 +3,7 @@ import { EXERCISE_BY_ID, LR_LABEL } from './data/exercises.js';
 import { buildTimeline, Session, PHASE_LABEL, formatClock, formatMinutes } from './engine.js';
 import { createFigure } from './figure.js';
 import { play, speak, stopSpeech, buzz, keepAwake } from './audio.js';
+import { hrAvailable, hrConnect, hrDisconnect, currentBpm } from './hr.js';
 import { state, addLog, dayKey, weekKey, logsInWeek, uid, videoFor, setSetting } from './store.js';
 import { $, esc, icon, partTag, spokenName, videoEmbedHtml, confirmSheet } from './ui.js';
 
@@ -31,6 +32,7 @@ export function openPlayer(menu, { onClose } = {}) {
       <div class="p-top">
         <button class="icon-btn" data-act="close" aria-label="終了">${icon('close')}</button>
         <div class="title">${esc(menu.name)}</div>
+        <div class="p-hr hidden" aria-label="心拍数">${icon('heart')}<b class="num">--</b></div>
         <div class="remain" aria-live="off"></div>
       </div>
       <div class="p-progress">${works.map(() => '<i><b></b></i>').join('')}</div>
@@ -81,6 +83,22 @@ export function openPlayer(menu, { onClose } = {}) {
   let halfDone = false;
   let timer = 0;
   let closed = false;
+
+  // 心拍計を登録してあれば、開いている間だけつないで今の心拍数を出す（完了画面でも出し続ける）
+  const useHr = hrAvailable() && !!settings.hrDevice;
+  const hrBox = $('.p-hr', root);
+  const hrNum = $('b', hrBox);
+  const paintHr = () => {
+    const bpm = currentBpm();
+    hrNum.textContent = bpm ?? '--';
+    hrBox.classList.toggle('live', !!bpm);
+  };
+  let hrTimer = 0;
+  if (useHr) {
+    hrBox.classList.remove('hidden');
+    hrConnect(settings.hrDevice);
+    hrTimer = setInterval(paintHr, 500);
+  }
 
   const exOf = (seg) => EXERCISE_BY_ID[seg.ex];
 
@@ -264,6 +282,8 @@ export function openPlayer(menu, { onClose } = {}) {
     if (closed) return;
     closed = true;
     clearInterval(timer);
+    clearInterval(hrTimer);
+    if (useHr) hrDisconnect();
     fig?.destroy();
     stopSpeech();
     keepAwake(false);

@@ -9,7 +9,7 @@
 - 保存：localStorage（キー `hiit-weekly:v1`、中身は `js/store.js` の `blank()` 参照）
 - オフライン：`sw.js`（Service Worker）
 - テスト：`node:test`（Node 20 以上）／ブラウザ通し確認：Playwright（任意・開発時のみ）
-- Android アプリ版：`android/`（Kotlin・WebView。Web 版のファイルをビルド時に assets へコピーして同梱）。依存は `androidx.webkit` のみ
+- Android アプリ版：`android/`（Kotlin・WebView。Web 版のファイルをビルド時に assets へコピーして同梱）。依存は `androidx.webkit` のみ。心拍計の受信（`HeartRate.kt`）は Android 標準の Bluetooth API だけで書いてある
 
 ## ローカルで動かす
 ```bash
@@ -43,6 +43,7 @@ js/store.js              保存データ・週（月曜はじまり）の計算�
 js/ui.js                 esc / icon / figSlot+mountFigures / stepper / toast / openSheet / confirmSheet
 js/video.js              YouTube・mp4 URL の解釈と埋め込みURL
 js/audio.js              ビープ（Web Audio）・音声読み上げ・バイブ・画面スリープ防止
+js/hr.js                 心拍計（Bluetooth）。通知の読み取り・状態・擬似の心拍計（?hrsim=1）。受信は android/ の HeartRate.kt
 js/data/                 exercises.js（35種目）/ menus.js（15プリセット）/ parts.js（5部位）
 tests/                   node:test
 scripts/                 serve.mjs（開発サーバー）/ smoke.mjs（ブラウザ通し確認）
@@ -64,7 +65,7 @@ dev/poses.html           ポーズ確認ページ
 ---
 
 ## Handoff
-<!-- updated: 2026-10-02 -->
+<!-- updated: 2026-10-07 -->
 
 ### タスク概要
 スマホで使う「週替わり・部位別HIIT」アプリ。v1 はクラウドの Claude Code セッションで実装済み（PR #12・下書き、ブランチ `claude/hiit-menu-app-wxte6y`）。
@@ -78,6 +79,7 @@ dev/poses.html           ポーズ確認ページ
 - 記録：ワーク区間を半分以上やったら1本。途中終了は運動10秒以上のときだけ記録
 - データは端末内のみ（アカウント・サーバーなし）。機種変更は設定画面の JSON バックアップ
 - 配布は **Android の APK を自分で入れる** 方式（2026-09-30 決定）。Play ストアには出さない。iPhone 対応は PWA（要公開）になるので今は保留
+- 心拍は **バンドの「心拍数を共有」（Bluetooth の標準の心拍サービス 0x180D）をアプリが直接受信** する（2026-10-07 決定）。Mi Fitness → Health Connect 経由は反映が30分〜1時間遅れ、細かさも不明で、運動直後の回復を見るのに向かないため使わない。目的は「最大心拍数」と「心拍回復（終了時 − 60秒後）」を見ること
 - `masahiro` リポジトリは **public**（2026-09-30 確認）。ユーザーの原則は private。公開のままにするか、このアプリを別の private リポジトリに移すかは未決定
 
 ### 実装ステップ
@@ -90,6 +92,9 @@ dev/poses.html           ポーズ確認ページ
 - [x] ✅ お手本アニメを棒人間から人物の絵に変更（2026-10-02。体の厚み・服・手足の先・首の向き。35種目のデータは変更なし）
 - [x] ✅ ビープ音・音声ガイドの音量を設定で5段階に（2026-10-02。`store.js` の `beepGain` / `voiceGain`。ビープは 3 が元の大きさ・初期値 4・5 が歪まない上限）
 - [x] ✅ Android アプリ版（`android/`）：WebView＋`HiitNative`（読み上げ・バイブ・スリープ防止・バックアップ保存/読込）、戻るボタン、外部リンク、ダーク。Pixel_6 エミュレータ（Android 17）で確認済み
+- [x] ✅ 心拍計・第1段階（2026-10-07）：`HeartRate.kt`（さがす・つなぐ・切れたらつなぎ直す）＋`js/hr.js`、設定画面の「心拍計」、ワークアウト画面の今の心拍数。ブラウザ（擬似の心拍計）とエミュレータ（許可・さがす・時間切れ・中止）で確認済み。**実物のバンドとの接続は未確認**
+- [ ] 心拍計を実機で確認：Band 10 の「心拍数を共有」をオン → 設定でさがして登録 → ワークアウト中に数字が出るか。Mi Fitness とつながったままで受信できるか、値が何秒おきに届くかも見る
+- [ ] 心拍計・第2段階（実機確認のあと）：ワークアウトごとの最大心拍数と、終了後60秒の回復（終了時 − 60秒後）を記録し、記録画面で推移を見る
 - [ ] APK を実機に入れて確認：ビープ音・音声（日本語の読み上げ）・バイブ・画面スリープ防止・YouTube/mp4 動画の埋め込み再生
 - [ ] PR #12 の扱い（説明文の更新・マージ）と、リポジトリを public のままにするかを決める
 - [ ] （iPhone でも使うなら）GitHub Pages で公開して PWA として確認
@@ -116,9 +121,13 @@ dev/poses.html           ポーズ確認ページ
   - システムバーの余白はアプリ側で付け、WebView には渡さない（渡すと CSS の `env(safe-area-inset-*)` と二重になる）
   - 音はすべてメディア音量で鳴る（`volumeControlStream = STREAM_MUSIC`）。読み上げの音量は `HiitNative.speak(text, 0〜1)` で渡す。音声は端末の音量より大きくはできない
   - テーマ色の変更（`CONFIG_ASSETS_PATHS`）では Activity が作り直される。`restoreState` できないときは最初のページを読む
+  - エミュレータ（メモリ 2GB）は起動直後の1分ほど、メモリ不足でアプリを次々に強制終了する（logcat の `lowmemorykiller`）。許可ダイアログを出した瞬間にアプリが消えたらこれ。落ち着いてから起動し直す
+  - 心拍計：エミュレータにも Bluetooth はあるが相手がいないので、確かめられるのは「許可 → さがす → 見つからない」まで。受信は実機だけ。画面は Web 版に `?hrsim=1` を付けて擬似の心拍計で確かめる
+  - 心拍計の接続は、設定画面とワークアウト画面を開いている間だけ（離れたら切る）。登録した機器は `settings.hrDevice`（`{ id, name }`、id は Bluetooth アドレス）
   - 動作確認は、デバッグ版の WebView に Chrome DevTools Protocol でつなぐと楽（`adb forward tcp:9222 localabstract:webview_devtools_remote_<pid>`）。エミュレータは `emulator -avd Pixel_6 -no-window`、adb には `MSYS_NO_PATHCONV=1`
 
 ### 未解決事項（CLIで判断が必要）
-- 次回最初にやること：実機での APK の確認結果を聞き、不具合があれば直す
+- 次回最初にやること：実機での APK の確認結果（心拍計がつながって数字が出たか）を聞き、不具合があれば直す。つながったら心拍計の第2段階へ
+- 心拍回復の測り方は未確定：案は「完了画面でそのまま60秒測り、終了時 − 60秒後 を記録」。途中の休憩ごとの下がり幅も見るかはユーザーと相談
 - 音量を上げても聞き取りにくい場合の候補：ビープ音の音色を変える（倍音を足す）、合図の間だけ他アプリの音楽を下げる（Android のオーディオフォーカス）
 - 検討候補（未決定・ユーザーと相談）：曜日ごとの週間計画（例：月水金に何をやるか）、部位の自動ローテーション、ウォームアップ／クールダウンの自動追加、BGM、記録のカレンダー表示

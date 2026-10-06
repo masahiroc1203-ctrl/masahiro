@@ -13,6 +13,7 @@ export const DEFAULT_SETTINGS = {
   vibrate: true, // バイブ（対応端末のみ）
   goal: 3, // 週の目標回数
   videoFirst: true, // 動画を登録した種目は動画で表示
+  hrDevice: null, // 登録した心拍計 { id, name }（Android アプリ版のみ）
 };
 
 // 音量（1〜5）→ 倍率。ビープ音は 3 が最初の版の大きさで、5 が歪まない上限（一番大きい音の振幅が 1 になる）。

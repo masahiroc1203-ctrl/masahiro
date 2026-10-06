@@ -757,6 +757,32 @@ ul.tips {
   color: var(--muted);
   font-size: 12px;
 }
+/* 設定の「心拍計」：左に機器の名前、右に今の心拍数 */
+.hr-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+}
+/* ボタンの文字は折り返さず、入りきらない幅では縦に並べる */
+.hr-status + .btn-row .btn {
+  white-space: nowrap;
+}
+.hr-now {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.hr-now svg.icon {
+  color: var(--work);
+}
+.hr-now .num {
+  font-size: 24px;
+  color: var(--text);
+}
 .stepper {
   display: inline-flex;
   align-items: center;
@@ -1193,6 +1219,29 @@ ul.tips {
   font-variant-numeric: tabular-nums;
   font-size: 14px;
   opacity: 0.9;
+}
+/* 今の心拍数。値が届いていない間は薄くする */
+.p-hr {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px 2px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.16);
+  font-size: 16px;
+  font-weight: 800;
+  opacity: 0.55;
+}
+.p-hr.live {
+  opacity: 1;
+}
+.p-hr svg.icon {
+  width: 16px;
+  height: 16px;
+}
+.p-hr b {
+  min-width: 3ch;
+  text-align: right;
 }
 .p-progress {
   display: flex;
