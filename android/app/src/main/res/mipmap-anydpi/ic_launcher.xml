@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Web版の icons/icon-512.png をそのまま背景にする（端末ごとの丸・角丸の形に切り抜かれる） -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@mipmap/ic_launcher_full" />
+    <foreground android:drawable="@android:color/transparent" />
+</adaptive-icon>
