@@ -9,7 +9,7 @@ mkdir -p stl images
 
 run() { if command -v xvfb-run >/dev/null 2>&1 && [ -z "${DISPLAY:-}" ]; then xvfb-run -a openscad "$@"; else openscad "$@"; fi; }
 
-for p in sprocket housing cover cap; do
+for p in sprocket housing cover cap stopper; do
   echo "== stl/$p.stl"
   openscad -D "part=\"$p\"" -o "stl/$p.stl" winder.scad
 done
@@ -23,9 +23,9 @@ img() { # name part camera(tx,ty,tz,rx,ry,rz,dist) [extra...]
   run -D "part=\"$part\"" "$@" -o "images/$name.png" --imgsize=1200,900 --viewall --autocenter \
       --camera="$cam" --colorscheme=Tomorrow winder.scad
 }
-img assembly       assembly       0,0,0,62,0,38,0
-img assembly_open  assembly_open  0,0,0,62,0,38,0
-img assembly_back  assembly       0,0,0,62,0,215,0
+img assembly       assembly       0,0,0,70,0,50,0
+img assembly_open  assembly_open  0,0,0,70,0,50,0
+img assembly_back  assembly       0,0,0,70,0,230,0
 img section        section        0,0,0,0,0,0,0 --projection=o
-img section_teeth  section_teeth  0,0,0,0,0,0,0 --projection=o
 img sprocket       sprocket       0,0,0,140,0,20,0 --render
+img stopper        stopper        0,0,0,50,0,30,0 --render

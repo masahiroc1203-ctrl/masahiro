@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-"""ロールカーテン自動巻き取り機（チェーン駆動・STS3215）の負荷／トルク／速度計算。
+"""ロールカーテン自動巻き取り機（ロール直下・チェーン2本挟み込み式・STS3215）の計算。
 
 使い方:
-    python3 winder_calc.py                 # 既定値（推定モデル）で計算
-    python3 winder_calc.py --teeth 12      # スプロケット歯数を指定して詳細表示
-    python3 winder_calc.py --f-up 22 --travel 1.85
-        # 実測値（上げ方向の最大チェーン力[N]、全行程のチェーン移動量[m]）で上書き
+    python3 winder_calc.py                         # 既定値（推定モデル・STS3215-C001）
+    python3 winder_calc.py --servo c046            # 減速比 1:147 版で比較
+    python3 winder_calc.py --f-up 22 --travel 1.85 --s-head 18.5
+        # 実測値（上げ方向の最大チェーン力[N]、全行程[m]、ヘッドのチェーン間隔の半分[mm]）で再計算
+    python3 winder_calc.py --t-bd 0.15             # 実測したサーボ逆駆動トルク[N·m]で手動操作力を計算
 
-標準ライブラリのみで動作する。数値の根拠は docs/mechanical_design.md の「3. 負荷計算」を参照。
+標準ライブラリのみで動作する。根拠は docs/mechanical_design.md を参照。
 """
 from __future__ import annotations
 
@@ -17,7 +18,15 @@ import math
 G = 9.80665
 KGCM = G / 100.0  # 1 kg·cm = 0.0980665 N·m
 
+# STS3215 の主な版（7.4 V）。C044 はトルク表記が販売店でばらつくため控えめな値を採用
+SERVOS = {
+    "c001": {"name": "STS3215-C001（1:345）", "stall_kgcm": 19.5, "noload_rpm": 52.0, "ratio": 345},
+    "c044": {"name": "STS3215-C044（1:191）", "stall_kgcm": 16.0, "noload_rpm": 86.0, "ratio": 191},
+    "c046": {"name": "STS3215-C046（1:147）", "stall_kgcm": 14.4, "noload_rpm": 106.0, "ratio": 147},
+}
 
+
+# ---------------------------------------------------------------- カーテン側
 def roll_diameter(x_hang: float, a: argparse.Namespace) -> float:
     """垂れ下がり長さ x_hang[m] のときの巻き径[m]。布を厚さ t のスパイラルとして近似。"""
     wound = a.height - x_hang
@@ -32,120 +41,157 @@ def roller_torque(x_hang: float, a: argparse.Namespace) -> float:
 
 
 def chain_profile(a: argparse.Namespace, n: int = 2000):
-    """全行程にわたるチェーン力とチェーン移動量を数値積分で求める。"""
+    """全行程にわたる最大チェーン力[N]とチェーン移動量[m]。"""
     f_max = 0.0
     travel = 0.0
     dx = a.height / n
     for i in range(n + 1):
         x = a.height * i / n
-        f = roller_torque(x, a) / (a.cw_pcd / 2.0) / a.eta_head
-        f_max = max(f_max, f)
+        f_max = max(f_max, roller_torque(x, a) / (a.cw_pcd / 2.0) / a.eta_head)
         if i < n:
-            xm = x + dx / 2.0
-            travel += a.cw_pcd / roll_diameter(xm, a) * dx
+            travel += a.cw_pcd / roll_diameter(x + dx / 2.0, a) * dx
     return f_max, travel
 
 
+# ---------------------------------------------------------------- ユニット側
 def sprocket(n_teeth: int, pitch: float):
-    """ボールチェーン用スプロケットのピッチ円直径[m]と1回転あたり送り量[m]。"""
-    pcd = pitch / math.sin(math.pi / n_teeth)
-    return pcd, n_teeth * pitch
+    """ピッチ円半径[m]・歯先半径[m]・1回転送り[m]。"""
+    r = pitch / (2.0 * math.sin(math.pi / n_teeth))
+    return r, r + 0.3 * a_ball, n_teeth * pitch
 
 
-def servo_at(torque: float, a: argparse.Namespace):
-    """直線トルク-速度特性で負荷時回転数[rpm]を推定。"""
-    ts = a.stall_kgcm * KGCM
+def pinch_geometry(n_teeth: int, a: argparse.Namespace):
+    """ピンチローラー配置と巻き掛け角。長さは mm、角度は度。
+
+    チェーンはヘッドのホイールから下りてきてスプロケットの外側に接し、
+    角度 gamma の位置にある外側のピンチローラーで向きを戻されて真下に垂れる。
+    """
+    r, _, _ = sprocket(n_teeth, a.pitch)
+    r *= 1e3
+    rho = a.brg_od / 2.0 + a.ball_d / 2.0              # ローラー周りのボール中心半径
+    d = r + rho + a.pinch_clr                           # スプロケット中心〜ローラー中心
+    roll_u = d * math.cos(math.radians(a.gamma))
+    leg_u = roll_u - rho                                # ユニット下のチェーン位置（中心から）
+    z_head = a.z_top + a.head_gap + a.head_drop        # ヘッドのホイール中心の高さ
+    hd = math.hypot(a.s_head, z_head)
+    a_in = math.degrees(math.atan2(z_head, a.s_head) - math.acos(r / hd))
+    wrap = a.gamma + a_in
+    tip = r + 0.3 * a.ball_d
+    roll_gap = d - a.brg_od / 2.0 - tip                 # ローラーと歯先のすきま
+    return {"r": r, "d": d, "rho": rho, "roll_u": roll_u, "leg_u": leg_u,
+            "a_in": a_in, "wrap": wrap, "pockets": wrap / (360.0 / n_teeth), "roll_gap": roll_gap}
+
+
+def servo_at(torque: float, sv: dict):
+    ts = sv["stall_kgcm"] * KGCM
     ratio = torque / ts
-    rpm = a.noload_rpm * max(0.0, 1.0 - ratio)
-    return ratio, rpm
+    return ratio, sv["noload_rpm"] * max(0.0, 1.0 - ratio)
+
+
+a_ball = 4.5e-3  # sprocket() の歯先計算用（m）
 
 
 def main() -> None:
+    global a_ball
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     # カーテン
     p.add_argument("--width", type=float, default=1.8, help="スクリーン幅 [m]")
-    p.add_argument("--height", type=float, default=2.0, help="昇降行程（スクリーン高さ）[m]")
-    p.add_argument("--cloth-density", type=float, default=0.35, help="生地の面密度 [kg/m^2]（遮光生地 0.3〜0.45）")
+    p.add_argument("--height", type=float, default=2.0, help="昇降行程 [m]")
+    p.add_argument("--cloth-density", type=float, default=0.35, help="生地の面密度 [kg/m^2]")
     p.add_argument("--cloth-t", type=float, default=0.5e-3, help="生地厚 [m]")
     p.add_argument("--bar-mass", type=float, default=0.4, help="ウエイトバー質量 [kg]")
-    # ヘッド（既製ロールスクリーンのチェーン機構）
-    p.add_argument("--pipe-d", type=float, default=0.032, help="ローラーパイプ外径 [m]（要実測）")
-    p.add_argument("--cw-pcd", type=float, default=0.038, help="ヘッド側チェーンホイールのピッチ円径 [m]（要実測）")
-    p.add_argument("--eta-head", type=float, default=0.7, help="ヘッド機構（クラッチ/ブレーキ）の効率")
-    p.add_argument("--f-down", type=float, default=8.0, help="下げ方向に必要なチェーン力 [N]（要実測）")
-    # 実測値で上書き
+    p.add_argument("--pipe-d", type=float, default=0.032, help="ローラーパイプ外径 [m]")
+    p.add_argument("--cw-pcd", type=float, default=0.038, help="ヘッド側チェーンホイールのピッチ円径 [m]")
+    p.add_argument("--eta-head", type=float, default=0.7, help="ヘッド機構の効率")
+    p.add_argument("--f-down", type=float, default=8.0, help="下げ方向のチェーン力 [N]")
     p.add_argument("--f-up", type=float, default=None, help="実測: 上げ方向の最大チェーン力 [N]")
     p.add_argument("--travel", type=float, default=None, help="実測: 全行程のチェーン移動量 [m]")
-    # 設計
-    p.add_argument("--margin", type=float, default=1.4, help="チェーン力の設計余裕（倍率）")
+    # ユニット
+    p.add_argument("--teeth", type=int, default=14, help="スプロケット歯数")
     p.add_argument("--pitch", type=float, default=6.0e-3, help="ボールチェーンのピッチ [m]")
-    p.add_argument("--teeth", type=int, default=14, help="詳細表示するスプロケット歯数")
-    # サーボ（STS3215-C001 7.4V, 1:345）
-    p.add_argument("--stall-kgcm", type=float, default=19.5, help="ストールトルク [kg·cm] @7.4V")
-    p.add_argument("--noload-rpm", type=float, default=52.0, help="無負荷回転数 [rpm] @7.4V")
+    p.add_argument("--ball-d", type=float, default=4.5, help="ボール径 [mm]")
+    p.add_argument("--s-head", type=float, default=19.0, help="ヘッドから垂れる2本の中心間距離の1/2 [mm]")
+    p.add_argument("--head-gap", type=float, default=30.0, help="ユニット上面〜ヘッド下面 [mm]")
+    p.add_argument("--head-drop", type=float, default=25.0, help="ヘッド下面〜ヘッドのホイール中心 [mm]")
+    p.add_argument("--z-top", type=float, default=20.0, help="スプロケット中心〜ユニット上面 [mm]")
+    p.add_argument("--gamma", type=float, default=57.0, help="ピンチローラーの角度 [deg]")
+    p.add_argument("--brg-od", type=float, default=6.0, help="ピンチローラー（軸受）外径 [mm]")
+    p.add_argument("--pinch-clr", type=float, default=0.2, help="ピンチ部のすきま [mm]")
+    p.add_argument("--eta-unit", type=float, default=0.95, help="ユニット内（ローラー・ガイド）の効率")
+    # サーボ・設計
+    p.add_argument("--servo", choices=sorted(SERVOS), default="c001")
+    p.add_argument("--margin", type=float, default=1.4, help="チェーン力の設計余裕")
     p.add_argument("--cont-ratio", type=float, default=0.25, help="連続使用の上限（ストール比）")
     p.add_argument("--speed-ratio", type=float, default=0.80, help="運転速度（負荷時回転数に対する指令比）")
+    p.add_argument("--t-bd", type=float, default=None, help="実測: トルクOFF時のサーボ逆駆動トルク [N·m]")
     a = p.parse_args()
+    a_ball = a.ball_d * 1e-3
+    sv = SERVOS[a.servo]
 
     f_model, travel_model = chain_profile(a)
     f_up = a.f_up if a.f_up is not None else f_model
     travel = a.travel if a.travel is not None else travel_model
-    f_design = f_up * a.margin
+    f_unit = f_up / a.eta_unit
+    f_design = f_unit * a.margin
     m_cloth = a.cloth_density * a.width * a.height
 
-    print("## 入力と負荷")
+    print("## 負荷")
     print()
-    print(f"- 生地質量 {m_cloth:.2f} kg + ウエイトバー {a.bar_mass:.2f} kg = 吊り下げ最大 {m_cloth + a.bar_mass:.2f} kg")
-    print(f"- 巻き径: 全閉時 {roll_diameter(a.height, a) * 1e3:.1f} mm → 全開時 {roll_diameter(0.0, a) * 1e3:.1f} mm")
+    print(f"- 吊り下げ最大 {m_cloth + a.bar_mass:.2f} kg（生地 {m_cloth:.2f} + ウエイトバー {a.bar_mass:.2f}）")
     src = "実測" if a.f_up is not None else "推定"
-    print(f"- 上げ方向 最大チェーン力 F_up = {f_up:.1f} N（{src}、全閉位置からの巻き上げ開始時）")
-    print(f"- 設計チェーン力 F_design = F_up × {a.margin} = {f_design:.1f} N")
-    print(f"- 下げ方向 チェーン力 F_down = {a.f_down:.1f} N（仮定）")
+    print(f"- 上げ方向 最大チェーン力 F_up = {f_up:.1f} N（{src}）→ ユニット内損失込み {f_unit:.1f} N")
+    print(f"- 設計チェーン力 = {f_unit:.1f} × {a.margin} = {f_design:.1f} N")
     src = "実測" if a.travel is not None else "推定"
     print(f"- 全行程のチェーン移動量 L = {travel:.2f} m（{src}）")
     print()
 
-    print("## スプロケット歯数ごとの比較（ピッチ {:.1f} mm）".format(a.pitch * 1e3))
+    print("## 歯数ごとの比較（{}）".format(sv["name"]))
     print()
-    print("| 歯数 | PCD [mm] | 送り [mm/rev] | 設計トルク [kg·cm] | ストール比 | 負荷時 [rpm] | 上げ時間 [s] | 行程の回転数 |")
+    print("| 歯数 | PCD [mm] | 巻き掛け [deg] | かみ合い [ポケット] | 設計トルク [kg·cm] | ストール比 | 上げ時間 [s] | ユニット下の2本の間隔 [mm] |")
     print("|---:|---:|---:|---:|---:|---:|---:|---:|")
-    for n in range(10, 21, 2):
-        pcd, feed = sprocket(n, a.pitch)
-        t = f_design * pcd / 2.0
-        ratio, rpm = servo_at(t, a)
+    for n in range(12, 19, 2):
+        r, _, feed = sprocket(n, a.pitch)
+        g = pinch_geometry(n, a)
+        t = f_design * r
+        ratio, rpm = servo_at(t, sv)
         v = feed * rpm * a.speed_ratio / 60.0
-        time_up = travel / v if v > 0 else float("inf")
         flag = " ⚠" if ratio > a.cont_ratio else ""
-        print(f"| {n} | {pcd * 1e3:.1f} | {feed * 1e3:.0f} | {t / KGCM:.2f} | {ratio * 100:.0f}%{flag} | "
-              f"{rpm:.0f} | {time_up:.0f} | {travel / feed:.1f} |")
-    print()
-    print(f"⚠ = 連続使用の目安（ストールの {a.cont_ratio * 100:.0f}%）を超える")
+        print(f"| {n} | {2 * r * 1e3:.1f} | {g['wrap']:.0f} | {g['pockets']:.1f} | {t / KGCM:.2f} | "
+              f"{ratio * 100:.0f}%{flag} | {travel / v:.0f} | {2 * g['leg_u']:.1f} |")
     print()
 
     n = a.teeth
-    pcd, feed = sprocket(n, a.pitch)
-    t_up = f_design * pcd / 2.0
-    t_dn = a.f_down * a.margin * pcd / 2.0
-    ratio, rpm = servo_at(t_up, a)
+    r, tip, feed = sprocket(n, a.pitch)
+    g = pinch_geometry(n, a)
+    t_up = f_design * r
+    ratio, rpm = servo_at(t_up, sv)
     rpm_cmd = rpm * a.speed_ratio
     v = feed * rpm_cmd / 60.0
-    steps_per_s = rpm_cmd / 60.0 * 4096
-    print(f"## 採用案: {n}歯スプロケット")
+    sps = rpm_cmd / 60.0 * 4096
+    print(f"## 採用案: {n} 歯 + {sv['name']}")
     print()
-    print(f"- PCD {pcd * 1e3:.2f} mm / 1回転送り {feed * 1e3:.0f} mm / エンコーダ 1step = {feed / 4096 * 1e3:.4f} mm")
-    print(f"- 上げ: 設計トルク {t_up / KGCM:.2f} kg·cm（{t_up:.3f} N·m, ストールの {ratio * 100:.0f}%）")
-    print(f"- 下げ: 設計トルク {t_dn / KGCM:.2f} kg·cm")
-    print(f"- 運転指令 {rpm_cmd:.0f} rpm ≒ {steps_per_s:.0f} step/s（Goal Speed）→ チェーン速度 {v * 1e3:.0f} mm/s")
-    print(f"- 全行程 {travel:.2f} m: {travel / v:.0f} 秒, サーボ {travel / feed:.1f} 回転 = {travel / feed * 4096:.0f} step")
-    # 開ループ PWM モード（Mode 2）ではロック時トルク ≒ デューティ × ストールトルク
-    t_nom = f_up * pcd / 2.0
-    for duty in (30, 35, 40):
-        f_lim = a.stall_kgcm * KGCM * duty / 100.0 / (pcd / 2.0)
-        spd = max(0.0, duty / 100.0 - t_nom / (a.stall_kgcm * KGCM)) * a.noload_rpm
-        t_home = travel / (feed * spd / 60.0) if spd > 0 else float("inf")
-        print(f"- PWM デューティ {duty}%（Mode 2）: ロック時の最大チェーン力 {f_lim:.0f} N, "
-              f"全閉からの原点出し {spd:.0f} rpm・最長 {t_home:.0f} 秒")
-    print(f"- 50 Hz ポーリング時の1周期移動量: {steps_per_s / 50:.0f} step（< 2048 なので多回転の展開が可能）")
+    print(f"- PCD {2 * r * 1e3:.2f} mm / 1 回転 {feed * 1e3:.0f} mm / 1 step = {feed / 4096 * 1e3:.4f} mm")
+    print(f"- ピンチローラー: スプロケット中心から {g['d']:.2f} mm、水平から下 {a.gamma:.0f}°、"
+          f"歯先とのすきま {g['roll_gap']:.2f} mm")
+    print(f"- 巻き掛け: {g['a_in']:+.1f}° から -{a.gamma:.0f}° まで = {g['wrap']:.1f}°（約 {g['pockets']:.1f} ポケット）")
+    print(f"- ユニット下のチェーン: 中心から ±{g['leg_u']:.2f} mm（2 本の間隔 {2 * g['leg_u']:.1f} mm）")
+    print(f"- 設計トルク {t_up / KGCM:.2f} kg·cm（ストールの {ratio * 100:.0f}%）")
+    print(f"- 指令 {rpm_cmd:.0f} rpm ≒ Goal Speed {sps:.0f} step/s → {v * 1e3:.0f} mm/s、"
+          f"全行程 {travel / v:.0f} 秒・{travel / feed:.1f} 回転")
+    print()
+
+    print("## 手で引くときの力（トルク OFF、モーターを逆に回しながら引く）")
+    print()
+    print("F_手 = F_up / η_unit + T_bd / r（T_bd = サーボの逆駆動トルク。実測が必要）")
+    print()
+    print("| 逆駆動トルク T_bd [N·m] | 上乗せ [N] | 全閉から上げ始めの手の力 [N] | [kgf] |")
+    print("|---:|---:|---:|---:|")
+    cases = [a.t_bd] if a.t_bd is not None else [0.05, 0.1, 0.2, 0.3]
+    for tbd in cases:
+        add = tbd / r
+        print(f"| {tbd:.2f} | {add:.1f} | {f_unit + add:.1f} | {(f_unit + add) / G:.1f} |")
+    print()
+    print(f"（参考: ユニットなしの既製品のまま引く力 = {f_up:.1f} N = {f_up / G:.1f} kgf）")
 
 
 if __name__ == "__main__":
