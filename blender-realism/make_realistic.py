@@ -19,8 +19,12 @@ make_realistic.py  -  Blender のモデルを写真に近い見た目にする�
 使い方（コマンドで・画面なし）
   blender -b -P make_realistic.py -- --model "C:\\dev\\house-3d-model\\house.glb" --render "C:\\dev\\house-3d-model\\render.png"
   blender -b "house.blend" -P make_realistic.py -- --render out.png --preview
+  DXF も読めます（同じフォルダに dxf2obj.py を置き、Python に ezdxf を入れておく: py -m pip install ezdxf）
+  blender -b -P make_realistic.py -- --model house.dxf --render out.png
+  2D の図面なら: --dxf-extrude "壁=2400,床=0"（レイヤー名=立ち上げる高さ mm）
   オプション: --samples 256 --time 15.5 --south -Y --res 1920x1080 --camera interior --exposure 0.5
               --hdri sky.exr --unit-scale 0.01 --no-materials --no-bevel --save out.blend --preview
+              --dxf-extrude "壁=2400,床=0" --dxf-colors --python "C:\\Python312\\python.exe"
 
 何度実行しても大丈夫です（自動で作ったもの「AUTO_...」は作り直します）。元のマテリアルは消さずに残ります。
 """
@@ -38,7 +42,10 @@ from mathutils import Matrix, Vector
 #  設定（ここを書き換えて使います）
 # ============================================================
 SETTINGS = dict(
-    MODEL_PATH="",            # 例: r"C:\dev\house-3d-model\house.glb"  空なら今開いているシーンを使う
+    MODEL_PATH="",            # 例: r"C:\dev\house-3d-model\house.dxf"  空なら今開いているシーンを使う
+    DXF_EXTRUDE="",           # DXF が 2D の図面のとき: 例 "壁=2400, 床=0"（レイヤー名=立ち上げる高さ mm、* も使える）
+    DXF_COLORS=False,         # DXF の線の色をマテリアルの色に使う（ふつうは線の色＝材質ではないので False）
+    PYTHON="",                # DXF 変換に使う Python（空なら py / python を自動で探す）
     UNIT_SCALE=None,          # None=自動判定 / 1=m / 0.01=cm / 0.001=mm
     TIME_OF_DAY=15.5,         # 太陽の時刻（6〜18）。15〜16時は窓から斜めに光が入ってきれい
     SOUTH="-Y",               # モデルの「南」の向き: "+X" "-X" "+Y" "-Y"（Blender の正面図は -Y 側から見ています）
@@ -72,10 +79,10 @@ CATEGORIES = [
                   "枠", "サッシ", "取っ手", "ノブ", "金属", "アルミ", "ステンレス", "手すり", "蛇口"]),
     ("wood",     ["sill", "窓台"]),
     ("mirror",   ["mirror", "鏡"]),
-    ("glass",    ["glass", "window", "pane", "glazing", "窓", "ガラス"]),
+    ("glass",    ["glass", "window", "pane", "glazing", "glaz", "窓", "ガラス"]),
     ("tile",     ["tile", "bath", "タイル", "浴室", "風呂"]),
-    ("floor",    ["floor", "flooring", "床", "フローリング"]),
-    ("ceiling",  ["ceiling", "天井"]),
+    ("floor",    ["floor", "flooring", "flor", "slab", "床", "フローリング", "スラブ"]),
+    ("ceiling",  ["ceiling", "clng", "天井"]),
     ("wall",     ["wall", "partition", "plaster", "壁", "間仕切", "しっくい", "漆喰", "クロス"]),
     ("roof",     ["roof", "屋根"]),
     ("ground",   ["ground", "grass", "lawn", "terrain", "garden", "yard", "地面", "芝", "庭"]),
@@ -85,8 +92,8 @@ CATEGORIES = [
                   "カーペット", "布", "布団"]),
     ("plant",    ["plant", "leaf", "leaves", "tree", "foliage", "bush", "植物", "葉", "観葉", "植栽"]),
     ("wood",     ["wood", "table", "desk", "shelf", "cabinet", "chair", "door", "board", "counter", "dresser",
-                  "chest", "drawer", "stair", "木", "テーブル", "机", "棚", "チェア", "椅子", "ドア", "扉",
-                  "カウンター", "家具", "収納", "階段"]),
+                  "chest", "drawer", "stair", "furn", "column", "beam", "木", "テーブル", "机", "棚", "チェア",
+                  "椅子", "ドア", "扉", "カウンター", "家具", "収納", "階段", "柱", "梁", "框", "ボード"]),
     ("plastic",  ["tv", "television", "テレビ", "plastic", "樹脂", "appliance", "家電"]),
 ]
 CATEGORY_JA = {"metal": "金属", "wood": "木", "mirror": "鏡", "glass": "ガラス", "tile": "タイル", "floor": "床（フローリング）",
@@ -210,9 +217,77 @@ def import_model(path):
             bpy.ops.wm.ply_import(filepath=path)
         elif ext in (".usd", ".usda", ".usdc", ".usdz"):
             bpy.ops.wm.usd_import(filepath=path)
+        elif ext == ".dxf":
+            bpy.ops.wm.obj_import(filepath=convert_dxf(path))
         else:
-            raise RuntimeError(f"この形式は読み込めません: {ext}（.blend .glb .gltf .obj .fbx .stl .ply .usd に対応）")
+            raise RuntimeError(f"この形式は読み込めません: {ext}（.blend .glb .gltf .obj .fbx .stl .ply .usd .dxf に対応）")
     log(f"モデルを読み込みました: {path}")
+
+
+def find_converter(model_path):
+    """dxf2obj.py を、このスクリプトの隣・モデルの隣・.blend の隣から探す"""
+    dirs = []
+    f = globals().get("__file__")
+    if f:
+        dirs.append(os.path.dirname(os.path.abspath(f)))
+    for t in bpy.data.texts:
+        if t.filepath and os.path.basename(t.filepath).lower().startswith("make_realistic"):
+            dirs.append(os.path.dirname(bpy.path.abspath(t.filepath)))
+    dirs.append(os.path.dirname(os.path.abspath(model_path)))
+    if bpy.data.filepath:
+        dirs.append(os.path.dirname(bpy.data.filepath))
+    for d in dirs:
+        p = os.path.join(d, "dxf2obj.py")
+        if os.path.isfile(p):
+            return p
+    raise RuntimeError("dxf2obj.py が見つかりません。make_realistic.py かモデルと同じフォルダに置いてください")
+
+
+def find_python():
+    """ezdxf が入っている Python を探す（Blender 本体の Python には入れない）"""
+    import shutil
+    import subprocess
+    cands = []
+    if SETTINGS["PYTHON"]:
+        cands.append([SETTINGS["PYTHON"]])
+    for name, extra in (("py", ["-3"]), ("python", []), ("python3", [])):
+        exe = shutil.which(name)
+        if exe and "WindowsApps" not in exe:      # Microsoft Store の案内だけ出す python.exe は除く
+            cands.append([exe] + extra)
+    for c in cands:
+        try:
+            r = subprocess.run(c + ["-c", "import ezdxf"], capture_output=True, timeout=60,
+                               creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+            if r.returncode == 0:
+                return c
+        except (OSError, subprocess.SubprocessError):
+            continue
+    raise RuntimeError("ezdxf の入った Python が見つかりません。PowerShell で「py -m pip install ezdxf」を実行してください"
+                       "（Python がなければ python.org から入れる）。場所を指定するときは PYTHON 設定か --python")
+
+
+def convert_dxf(path):
+    import subprocess
+    conv = find_converter(path)
+    py = find_python()
+    out = os.path.splitext(path)[0] + "_converted.obj"
+    cmd = py + [conv, path, "-o", out]
+    if SETTINGS["DXF_EXTRUDE"]:
+        cmd += ["--extrude", SETTINGS["DXF_EXTRUDE"]]
+    if SETTINGS["DXF_COLORS"]:
+        cmd.append("--use-colors")
+    log("DXF を変換しています…")
+    env = dict(os.environ, PYTHONIOENCODING="utf-8")
+    r = subprocess.run(cmd, capture_output=True, env=env, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    text = (r.stdout or b"").decode("utf-8", "replace").strip()
+    for line in text.splitlines():
+        if line and not line.startswith(("DXF:", "書き出し:")):
+            log("  " + line)
+    if r.returncode != 0:
+        err = (r.stderr or b"").decode("utf-8", "replace").strip().splitlines()[-3:]
+        raise RuntimeError("DXF を立体にできませんでした。" + (" / ".join(err) if r.returncode != 3 else
+                           "2D の図面なら DXF_EXTRUDE（--dxf-extrude）で立ち上げるレイヤーを指定してください"))
+    return out
 
 
 def fix_units(meshes):
@@ -761,7 +836,19 @@ def add_ground(mn, mx, meshes):
     log("地面を追加しました（モデルのいちばん下の 2cm 下）")
 
 
-def setup_cameras(mn, mx):
+def largest_glass(meshes):
+    best, area = None, 0.0
+    for o in meshes:
+        if classify(o, o.active_material) != "glass":
+            continue
+        a, b = world_bbox([o])
+        s = sorted(b - a, reverse=True)
+        if s[0] * s[1] > area:
+            best, area = (a + b) / 2, s[0] * s[1]
+    return best
+
+
+def setup_cameras(mn, mx, meshes):
     sc = scene()
     mode = SETTINGS["CAMERA"]
     if mode == "keep" or (mode == "auto" and sc.camera is not None and not sc.camera.name.startswith("AUTO_")):
@@ -783,18 +870,32 @@ def setup_cameras(mn, mx):
         sc.collection.objects.link(o)
         return o
     inner = make("AUTO_Cam_Interior", 18)
-    inner.location = Vector((c.x, mn.y + size.y * 0.22, mn.z + SETTINGS["EYE_HEIGHT"]))
-    look_at(inner, Vector((c.x, mx.y, mn.z + SETTINGS["EYE_HEIGHT"] - 0.15)))
+    eye = mn.z + SETTINGS["EYE_HEIGHT"]
+    win = largest_glass(meshes)
+    if win is not None:
+        # いちばん大きい窓の反対側から、窓に向かって見る（日差しが床に落ちる様子が入る）
+        d = Vector((c.x - win.x, c.y - win.y, 0))
+        d = d.normalized() if d.length > 1e-6 else Vector((0, 1, 0))
+        lo, hi = mn + Vector((0.3, 0.3, 0)), mx - Vector((0.3, 0.3, 0))
+        t = min(((hi[i] if d[i] > 0 else lo[i]) - win[i]) / d[i] for i in (0, 1) if abs(d[i]) > 1e-6)
+        p = win + d * max(0.5, t * 0.85)
+        inner.location = Vector((p.x, p.y, eye))
+        look_at(inner, Vector((win.x, win.y, mn.z + 1.1)))
+    else:
+        inner.location = Vector((c.x, mn.y + size.y * 0.22, eye))
+        look_at(inner, Vector((c.x, mx.y, eye - 0.15)))
     outer = make("AUTO_Cam_Exterior", 35)
     diag = size.length
     outer.location = c + Vector((-0.75, -1.25, 0)).normalized() * diag * 1.35 + Vector((0, 0, size.z * 0.35 + 1.5))
     look_at(outer, c)
     if mode == "interior" or (mode != "exterior" and max(size.x, size.y) <= 8.0):
         sc.camera = inner
-        log("室内カメラ（目線 %.2fm・18mm）を作ってアクティブにしました。外観は AUTO_Cam_Exterior" % SETTINGS["EYE_HEIGHT"])
+        log("室内カメラ（目線 %.2fm・18mm%s）を作ってアクティブにしました。外観は AUTO_Cam_Exterior"
+            % (SETTINGS["EYE_HEIGHT"], "・いちばん大きい窓に向けて" if win is not None else ""))
     else:
         sc.camera = outer
-        log("外観カメラを作ってアクティブにしました。室内は AUTO_Cam_Interior（位置は調整してください）")
+        log("外観カメラを作ってアクティブにしました。室内は AUTO_Cam_Interior")
+    log("カメラの向きを変えるには: 好きな視点にしてから Ctrl+Alt+テンキー0（今の視点にカメラを合わせる）")
 
 
 def set_exposure(mn, mx):
@@ -862,7 +963,7 @@ def main(**overrides):
             add_bevels(meshes, glass)
         if SETTINGS["ADD_GROUND"]:
             add_ground(mn, mx, meshes)
-        setup_cameras(mn, mx)
+        setup_cameras(mn, mx, meshes)
         set_exposure(mn, mx)
         write_report()
         if SETTINGS["SAVE_BLEND"]:
@@ -902,6 +1003,9 @@ def parse_cli():
     p.add_argument("--sun", type=float)
     p.add_argument("--hdri")
     p.add_argument("--unit-scale", type=float)
+    p.add_argument("--dxf-extrude")
+    p.add_argument("--dxf-colors", action="store_true")
+    p.add_argument("--python")
     p.add_argument("--preview", action="store_true")
     p.add_argument("--cpu", action="store_true")
     p.add_argument("--no-materials", action="store_true")
@@ -909,7 +1013,9 @@ def parse_cli():
     a = p.parse_args(sys.argv[sys.argv.index("--") + 1:])
     o = dict(MODEL_PATH=a.model, RENDER_PATH=a.render, SAVE_BLEND=a.save, SAMPLES=a.samples, TIME_OF_DAY=a.time,
              SOUTH=a.south, CAMERA=a.camera, EXPOSURE=a.exposure, SKY_STRENGTH=a.sky, SUN_STRENGTH=a.sun,
-             HDRI_PATH=a.hdri, UNIT_SCALE=a.unit_scale)
+             HDRI_PATH=a.hdri, UNIT_SCALE=a.unit_scale, DXF_EXTRUDE=a.dxf_extrude, PYTHON=a.python)
+    if a.dxf_colors:
+        o["DXF_COLORS"] = True
     if a.res:
         w, h = a.res.lower().split("x")
         o["RESOLUTION"] = (int(w), int(h))
