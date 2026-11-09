@@ -6,6 +6,10 @@
 set -euo pipefail
 
 command -v smbd >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq samba; }
+# パッケージを入れると標準の Samba が自動で起動するので止める (PID ファイルが重なって起動できないため)
+if command -v systemctl >/dev/null; then
+  sudo systemctl stop smbd nmbd samba-ad-dc 2>/dev/null || true
+fi
 
 dir="$(mktemp -d)"
 chmod 755 "$dir"
@@ -22,6 +26,8 @@ cat > "$dir/smb.conf" <<CONF
   load printers = no
   printing = bsd
   printcap name = /dev/null
+  pid directory = $dir
+  log file = $dir/smbd.log
 [share]
   path = $dir/share
   read only = no
@@ -36,4 +42,5 @@ for _ in $(seq 1 20); do
   sleep 0.5
 done
 echo "Samba did not start" >&2
+cat "$dir/smbd.log" >&2 2>/dev/null || true
 exit 1

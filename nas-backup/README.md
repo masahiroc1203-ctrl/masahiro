@@ -30,6 +30,9 @@ NAS（または家のPC）でサーバーを動かし、スマホのブラウザ
 > **バッファロー LinkStation（LS720D など）、Docker が使えない NAS の場合**
 > サーバーを Raspberry Pi や Windows PC で動かし、NAS の共有フォルダへ保存します。
 > 👉 [LS720D での使い方](docs/LS720D.md)
+>
+> **Android スマホなら、サーバー無しで NAS に直接保存できる専用アプリもあります。**
+> 👉 [Android アプリ](android/README.md)
 
 ## インストール
 
@@ -160,6 +163,7 @@ make docker  # Docker イメージを作成
 | `metadata.go` | 撮影日時の読み取り（JPEG / HEIC / MP4 / MOV / TIFF） |
 | `web/` | スマホ用の画面（HTML / CSS / JavaScript、実行ファイルに埋め込み） |
 | `deploy/ls720d/` | LS720D 用の設定（Raspberry Pi 用 docker-compose、Windows 用起動ファイル） |
+| `android/` | NAS に直接保存する Android アプリ |
 | `docs/` | 機種別の手順 |
 
 ### API
