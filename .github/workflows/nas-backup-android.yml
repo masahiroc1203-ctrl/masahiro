@@ -1,0 +1,68 @@
+name: nas-backup-android
+
+# Android アプリ (nas-backup/android) のテストと APK のビルド。
+# - Actions の実行結果ページの「Artifacts」から nas-backup-android-apk をダウンロードできる
+# - GitHub で Release を公開すると、APK が Release に添付される
+on:
+  push:
+    branches: [main]
+    paths: ["nas-backup/android/**", ".github/workflows/nas-backup-android.yml"]
+  pull_request:
+    paths: ["nas-backup/android/**", ".github/workflows/nas-backup-android.yml"]
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: nas-backup/android
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Start Samba (SMB server for integration tests)
+        run: ./scripts/start-test-samba.sh
+
+      - name: Test
+        env:
+          SMB_TEST_HOST: 127.0.0.1
+          SMB_TEST_PORT: "1445"
+          SMB_TEST_SHARE: share
+          SMB_TEST_USER: smbtest
+          SMB_TEST_PASSWORD: secret
+        run: ./gradlew :core:test --console=plain
+
+      - name: Build APK
+        env:
+          # 任意: リポジトリの Secrets に署名鍵を登録すると、毎回同じ鍵で署名される (上書きアップデートできる)
+          KEYSTORE_BASE64: ${{ secrets.NASBACKUP_KEYSTORE_BASE64 }}
+          NASBACKUP_KEYSTORE_PASSWORD: ${{ secrets.NASBACKUP_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/nasbackup.keystore"
+            export NASBACKUP_KEYSTORE="$RUNNER_TEMP/nasbackup.keystore"
+          fi
+          ./gradlew :app:assembleRelease --console=plain
+          mkdir -p dist
+          cp app/build/outputs/apk/release/app-release.apk dist/nas-backup-android.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nas-backup-android-apk
+          path: nas-backup/android/dist/nas-backup-android.apk
+
+      - name: Attach APK to release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" dist/nas-backup-android.apk --clobber
