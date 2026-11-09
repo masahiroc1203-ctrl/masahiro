@@ -41,6 +41,7 @@ var (
 	ErrInvalidOwner  = errors.New("invalid folder name")
 	ErrInvalidSize   = errors.New("invalid file size")
 	ErrInvalidLayout = errors.New("layout must be \"date\" or \"flat\"")
+	ErrNoBackupDir   = errors.New("backup directory does not exist")
 )
 
 // FileInfo はクライアントから送られるファイル情報。
@@ -93,6 +94,11 @@ func NewStore(root, layout string) (*Store, error) {
 	root, err := filepath.Abs(root)
 	if err != nil {
 		return nil, err
+	}
+	// 保存先フォルダは自動では作らない。NAS の共有フォルダがマウントされていないときに
+	// ローカルのディスク (Raspberry Pi の SD カードなど) へ保存してしまうのを防ぐため。
+	if st, err := os.Stat(root); err != nil || !st.IsDir() {
+		return nil, fmt.Errorf("%w: %s", ErrNoBackupDir, root)
 	}
 	s := &Store{
 		root:   root,
@@ -468,11 +474,9 @@ func (s *Store) CleanupStale(maxAge time.Duration) {
 	}
 }
 
+// moveFile は src を dst へ移動する。呼び出し側で dst が存在しないことを確認済みであること。
+// (Link + Remove だと SMB 共有ではNASの「ごみ箱」に一時ファイルが溜まるので Rename を使う)
 func moveFile(src, dst string) error {
-	if err := os.Link(src, dst); err == nil {
-		// Link は宛先が存在すると失敗するので上書き事故が起きない
-		return os.Remove(src)
-	}
 	if err := os.Rename(src, dst); err == nil {
 		return nil
 	}

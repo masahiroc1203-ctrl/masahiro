@@ -40,6 +40,11 @@ func main() {
 	}
 
 	store, err := NewStore(*dir, *layout)
+	if errors.Is(err, ErrNoBackupDir) {
+		log.Fatalf("保存先フォルダが見つかりません: %s\n"+
+			"  ・フォルダを作成してから起動してください\n"+
+			"  ・NAS の共有フォルダを使う場合は、NAS の電源が入っていて共有フォルダに接続 (マウント) できているか確認してください", *dir)
+	}
 	if err != nil {
 		log.Fatalf("保存先を開けません (%s): %v", *dir, err)
 	}

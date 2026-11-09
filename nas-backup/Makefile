@@ -5,6 +5,7 @@ LDFLAGS := -s -w
 
 ## 開発用: ./backup に保存するサーバーを起動
 run:
+	mkdir -p backup
 	go run . -dir ./backup
 
 build:

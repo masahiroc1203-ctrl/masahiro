@@ -2,3 +2,4 @@
 /dist/
 /nas-backup
 /nas-backup.exe
+.env

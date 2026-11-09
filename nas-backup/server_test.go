@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -383,5 +384,16 @@ func TestSanitizeName(t *testing.T) {
 	got, err := sanitizeName(long, 200)
 	if err != nil || len(got) > 200 || !strings.HasSuffix(got, "あ.jpg") {
 		t.Errorf("long name = %q (%d bytes), %v", got, len(got), err)
+	}
+}
+
+func TestMissingBackupDirIsNotCreated(t *testing.T) {
+	// NAS がマウントされていないときにローカルへ書き込まないよう、保存先フォルダは自動作成しない
+	missing := filepath.Join(t.TempDir(), "not-mounted", "SmartphoneBackup")
+	if _, err := NewStore(missing, "date"); !errors.Is(err, ErrNoBackupDir) {
+		t.Fatalf("err = %v, want ErrNoBackupDir", err)
+	}
+	if _, err := os.Stat(missing); err == nil {
+		t.Fatal("backup dir was created")
 	}
 }

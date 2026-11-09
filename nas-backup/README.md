@@ -27,9 +27,13 @@ NAS（または家のPC）でサーバーを動かし、スマホのブラウザ
 - NAS（Synology / QNAP / その他 Docker が動くもの）、または常時起動している家の PC・Raspberry Pi
 - スマホと NAS が同じ家庭内ネットワークにあること
 
+> **バッファロー LinkStation（LS720D など）、Docker が使えない NAS の場合**
+> サーバーを Raspberry Pi や Windows PC で動かし、NAS の共有フォルダへ保存します。
+> 👉 [LS720D での使い方](docs/LS720D.md)
+
 ## インストール
 
-### A. NAS の Docker で動かす（おすすめ）
+### A. NAS の Docker で動かす（Synology / QNAP など）
 
 Synology は「Container Manager」、QNAP は「Container Station」から使えます。
 
@@ -49,7 +53,7 @@ Synology は「Container Manager」、QNAP は「Container Station」から使�
 
 ### B. 家の PC / Raspberry Pi で動かす
 
-実行ファイルを作って（`make dist` → `dist/` に各OS用ができます）、NAS の共有フォルダを保存先に指定して起動します。
+実行ファイルを用意して（GitHub の Actions の「Artifacts」からダウンロード、または `make dist` → `dist/` に各OS用ができます）、NAS の共有フォルダを保存先に指定して起動します。保存先のフォルダは先に作っておいてください。
 
 ```sh
 # Linux / Raspberry Pi（NAS の共有フォルダを /mnt/nas にマウント済みの場合）
@@ -132,6 +136,7 @@ NAS 上のファイルを削除した場合は、もう一度バックアップ�
 | 症状 | 対処 |
 | --- | --- |
 | スマホでページが開けない | スマホが家の Wi-Fi につながっているか（モバイル通信になっていないか）、NAS の IP アドレス・ポートが正しいか、NAS / PC のファイアウォールで 8080 番が許可されているかを確認 |
+| 起動時に「保存先フォルダが見つかりません」 | 保存先フォルダを作成してください。NAS の共有フォルダの場合は NAS の電源と接続（マウント）を確認。※NAS 未接続のまま PC や Raspberry Pi 本体に保存してしまわないよう、保存先フォルダは自動では作りません |
 | 「NASの空き容量が足りません」 | NAS の容量を空けてから「失敗したファイルを再試行」 |
 | 撮影日と違うフォルダに入る | 撮影日時の情報が無いファイルは更新日時で振り分けます。`TZ` の設定も確認してください |
 | 保存したファイルを NAS のユーザーで消せない | Docker の `user:` に NAS ユーザーの uid:gid を設定 |
@@ -154,6 +159,8 @@ make docker  # Docker イメージを作成
 | `store.go` | 保存処理（再開・重複判定・フォルダ分け） |
 | `metadata.go` | 撮影日時の読み取り（JPEG / HEIC / MP4 / MOV / TIFF） |
 | `web/` | スマホ用の画面（HTML / CSS / JavaScript、実行ファイルに埋め込み） |
+| `deploy/ls720d/` | LS720D 用の設定（Raspberry Pi 用 docker-compose、Windows 用起動ファイル） |
+| `docs/` | 機種別の手順 |
 
 ### API
 
