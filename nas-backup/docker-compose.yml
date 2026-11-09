@@ -1,0 +1,18 @@
+services:
+  nas-backup:
+    build: .
+    image: nas-backup:latest
+    container_name: nas-backup
+    restart: unless-stopped
+    ports:
+      - "8080:8080"           # スマホからは http://<NASのIP>:8080 で開く
+    environment:
+      TZ: Asia/Tokyo           # 撮影年月フォルダの基準になるタイムゾーン
+      BACKUP_LAYOUT: date      # date=撮影年月ごとにフォルダ分け / flat=分けない
+      # BACKUP_PASSWORD: "変更してください"   # 設定するとアクセス時にパスワードを聞かれる
+    volumes:
+      # 左側を NAS 上の保存先フォルダに変更する (例は Synology の場合)
+      - /volume1/photo/SmartphoneBackup:/backup
+    # 保存されるファイルの所有者を NAS のユーザーにしたい場合に指定する
+    # (NAS に SSH して `id ユーザー名` で uid:gid を確認。Synology の最初のユーザーは多くの場合 1026:100)
+    # user: "1026:100"

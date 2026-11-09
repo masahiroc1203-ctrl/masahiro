@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#2563eb">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="NASバックアップ">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>NASバックアップ</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon-180.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1><img src="icon.svg" alt="" width="28" height="28"> NASバックアップ</h1>
+    <div id="disk" class="disk" hidden>
+      <div class="disk-text"><span id="disk-free"></span></div>
+      <div class="disk-bar"><div id="disk-used"></div></div>
+    </div>
+  </header>
+
+  <main>
+    <section class="card">
+      <label class="field">
+        <span class="field-label">保存先フォルダ名 <small>（家族で使うときは名前を入れると分けて保存されます）</small></span>
+        <input id="owner" type="text" maxlength="32" placeholder="例: papa" autocomplete="off" autocapitalize="off" spellcheck="false">
+      </label>
+      <p class="dest">保存先: <code id="dest-preview">/</code></p>
+    </section>
+
+    <label class="pick" id="pick">
+      <input id="file-input" type="file" multiple accept="image/*,video/*">
+      <span class="pick-icon" aria-hidden="true">＋</span>
+      <span class="pick-text">写真・動画を選ぶ</span>
+      <span class="pick-sub">何回かに分けて追加できます</span>
+    </label>
+    <label class="pick-alt" id="pick-alt">
+      <input id="file-input-any" type="file" multiple>
+      ファイルアプリ・フォルダから選ぶ
+    </label>
+
+    <section id="summary" class="summary" hidden>
+      <div class="counts">
+        <span><b id="c-total">0</b>件 選択</span>
+        <span class="muted" id="c-size"></span>
+      </div>
+      <div class="chips">
+        <span class="chip chip-done">完了 <b id="c-done">0</b></span>
+        <span class="chip chip-skip">済み <b id="c-skip">0</b></span>
+        <span class="chip chip-err">失敗 <b id="c-err">0</b></span>
+      </div>
+      <div class="overall" id="overall">
+        <div class="bar"><div id="overall-bar"></div></div>
+        <div class="overall-text"><span id="overall-text"></span><span id="speed"></span></div>
+      </div>
+      <div class="list-actions">
+        <button type="button" class="link" id="retry-btn" hidden>失敗したファイルを再試行</button>
+        <button type="button" class="link" id="clear-btn">リストを空にする</button>
+      </div>
+    </section>
+
+    <p id="notice" class="notice" hidden></p>
+
+    <ul id="list" class="list"></ul>
+
+    <section class="help">
+      <details>
+        <summary>使い方のヒント</summary>
+        <ul>
+          <li>スマホとNASを同じWi-Fiにつないで使います。</li>
+          <li>送信中は画面を開いたままにしてください。スリープやアプリ切り替えで止まっても、「バックアップ開始」を押すと続きから再開します。</li>
+          <li>画面を閉じてしまった場合も、同じファイルを選び直せば続きから送れます。</li>
+          <li>すでにNASにあるファイルは自動でスキップされます。</li>
+          <li>写真ライブラリから選ぶと、端末や設定によっては写真の形式が変換されたり、動画が圧縮されたり、位置情報が省かれたりすることがあります。気になる場合は「ファイルアプリ・フォルダから選ぶ」を使ってください。</li>
+          <li>ホーム画面に追加するとアプリのように使えます（iPhone: 共有 → ホーム画面に追加）。</li>
+        </ul>
+      </details>
+    </section>
+  </main>
+
+  <footer class="actionbar">
+    <button type="button" id="start-btn" class="primary" disabled>写真・動画を選んでください</button>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
