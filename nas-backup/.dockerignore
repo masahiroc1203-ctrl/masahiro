@@ -1,0 +1,5 @@
+backup/
+dist/
+testdata/
+*_test.go
+android/

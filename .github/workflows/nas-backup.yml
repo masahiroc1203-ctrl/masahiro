@@ -1,0 +1,42 @@
+name: nas-backup
+
+# テストを実行し、各OS用の実行ファイルを作る。
+# - Actions の実行結果ページの「Artifacts」から nas-backup-binaries をダウンロードできる
+# - GitHub で Release を公開すると、実行ファイルが Release に添付される
+on:
+  push:
+    branches: [main]
+    paths: ["nas-backup/**", ".github/workflows/nas-backup.yml"]
+  pull_request:
+    paths: ["nas-backup/**", ".github/workflows/nas-backup.yml"]
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: nas-backup
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: nas-backup/go.mod
+      - name: Test
+        run: make test
+      - name: Build binaries
+        run: make dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nas-backup-binaries
+          path: nas-backup/dist/
+      - name: Attach binaries to release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" dist/* --clobber

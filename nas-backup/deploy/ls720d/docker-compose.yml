@@ -1,0 +1,31 @@
+# Raspberry Pi など (Docker が動く家の機器) で nas-backup を動かし、
+# バッファロー LinkStation LS720D の共有フォルダへ SMB で保存する構成。
+#
+# 使い方:
+#   cp .env.example .env    # NAS の IP アドレス・共有フォルダ・ユーザー名・パスワードを書く
+#   docker compose up -d --build
+#
+# 詳しくは ../../docs/LS720D.md を参照。
+services:
+  nas-backup:
+    build: ../..
+    image: nas-backup:latest
+    container_name: nas-backup
+    restart: unless-stopped        # NAS がまだ起動していないときなどは自動で再試行する
+    ports:
+      - "8080:8080"                # スマホからは http://<この機器のIP>:8080 で開く
+    environment:
+      TZ: Asia/Tokyo
+      BACKUP_LAYOUT: ${BACKUP_LAYOUT:-date}
+      BACKUP_PASSWORD: ${BACKUP_PASSWORD:-}
+    volumes:
+      - ls720d:/backup
+
+volumes:
+  ls720d:
+    driver: local
+    driver_opts:
+      type: cifs
+      # 共有フォルダの中の「SmartphoneBackup」フォルダを /backup として使う
+      device: "//${NAS_IP:?NAS_IP を .env に設定してください}/${NAS_SHARE:?NAS_SHARE を .env に設定してください}"
+      o: "addr=${NAS_IP},username=${NAS_USER:-guest},password=${NAS_PASSWORD:-},vers=${NAS_SMB_VERSION:-3.0},iocharset=utf8,file_mode=0664,dir_mode=0775"
