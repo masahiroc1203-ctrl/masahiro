@@ -32,7 +32,7 @@ GAS_YEN_PER_M3 = 210.0  # 東邦ガス一般料金の目安
 MIN_REGRESSION_SAMPLES = 5
 
 # --- HEMS（NEC IG1002STC/SF 計測ユニット。ECHONET LiteでLAN直接取得） ---
-HEMS_METER_IP = "192.168.11.3"
+HEMS_METER_IP = "192.168.11.51"
 HEMS_RAW_CSV = DATA_DIR / "hems_raw.csv"  # poll_hems.py が積算カウンタを追記する生ログ
 
 # 計測ユニット設定画面（センサ番号→計測対象名）の割り付け。グラフは英語ラベル。
