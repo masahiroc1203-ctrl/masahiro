@@ -25,7 +25,7 @@ PC (pc-sender)  ──Bluetooth RFCOMM / 1行1JSON──▶  スマホ (android-
 
 ### 1. スマホ側（先にこちら）
 1. Android Studio で `android-relay` フォルダを開き、スマホをつないで ▶（Run）
-   - コマンドなら `android-relay` で `gradlew.bat installDebug`（スマホの「USB デバッグ」をオンにしておく）
+   - コマンドなら `android-relay` で `.\gradlew.bat installDebug`（スマホの「USB デバッグ」をオンにしておく。PowerShell では先頭の `.\` が必要）
 2. アプリで「サービス開始」を押し、「付近のデバイス」と「通知」を許可する
 3. 「バッテリー最適化の除外設定を開く」で除外する（しないと、しばらくして止まることがある）
 4. 「テスト通知を発行」を押し、スマホに通知が出るのを確かめる
@@ -37,6 +37,7 @@ cd bt-notify-relay\pc-sender
 dotnet run
 ```
 - タスクトレイに「BT」の丸いアイコンが出ます。**緑 = 接続中 / 黄 = 検索・待機中 / 赤 = エラー**。状態は右クリックメニューの一番上にも出ます
+  - Windows 11 では最初はタスクバー右の「^」の中に隠れます。常に出すには、設定 → 個人用設定 → タスクバー → その他のシステム トレイ アイコン で BtNotifySender をオンにします
 - 右クリック →「テスト通知を送信」→ スマホ → バンドに届けば成功
 - 「クイックタイマー」→「5分後に通知」で、5 分後に届くか
 - 予定: クラシック版 Outlook を起動しておき、「予定を今すぐ再読み込み」で件数が出るか。予定の 10 分前・5 分前・開始時刻に届きます
@@ -94,5 +95,5 @@ Gemini のチャットにあったコードは、最初のコミットにその�
 
 ## 開発メモ
 - PC 側の単体テスト: `cd pc-sender.Tests && dotnet test`（Windows 以外でも動く）
-- Android の単体テスト: `cd android-relay && gradlew testDebugUnitTest`
+- Android の単体テスト: `cd android-relay && .\gradlew.bat testDebugUnitTest`（Linux / macOS は `./gradlew`）
 - PC 側は `EnableWindowsTargeting` を入れてあるので、Linux でもビルドだけはできる（実行は Windows のみ）
