@@ -1,0 +1,22 @@
+{
+  "target_device_name": "S25",
+  "enable_outlook_com": true,
+  "ics_sources": [],
+  "reminder_minutes_before": [10, 5, 0],
+  "custom_reminders": [
+    {
+      "title": "水分補給・ストレッチ",
+      "body": "1時間経過しました。軽く体を動かしましょう",
+      "time": "10:30",
+      "days": ["Mon", "Tue", "Wed", "Thu", "Fri"]
+    },
+    {
+      "title": "作業区切りチェック",
+      "body": "今日のタスク進捗を確認してください",
+      "time": "17:15",
+      "days": ["Mon", "Tue", "Wed", "Thu", "Fri"]
+    }
+  ],
+  "quiet_hours_start": "23:00",
+  "quiet_hours_end": "07:00"
+}

@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Bluetooth / WinForms に依存しない部分 (通信形式・リマインダー時刻・ICS・設定) だけを取り込んでテストする。
+    net8.0 なので Windows 以外でも dotnet test で動く。
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\pc-sender\AppConfig.cs" Link="Shared\AppConfig.cs" />
+    <Compile Include="..\pc-sender\Protocol.cs" Link="Shared\Protocol.cs" />
+    <Compile Include="..\pc-sender\ReminderClock.cs" Link="Shared\ReminderClock.cs" />
+    <Compile Include="..\pc-sender\IcsParser.cs" Link="Shared\IcsParser.cs" />
+    <Compile Include="..\pc-sender\TimerManager.cs" Link="Shared\TimerManager.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" Version="8.10.0" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+</Project>
