@@ -155,6 +155,8 @@ bt-notify-relay/
 │   ├── OutlookCalendar.cs      # クラシック版 Outlook (COM) から予定取得
 │   ├── IcsParser.cs            # ICS の読み取り
 │   ├── ReminderClock.cs        # 時刻計算 (静かな時間帯・曜日)
+│   ├── TimerManager.cs         # タイマー (好きな分数・取り消し)
+│   ├── TimerDialog.cs          # 分数とメモを入れるダイアログ
 │   ├── NotificationWatcher.cs  # Windows 通知の監視 (MSIX 化するまで未使用)
 │   └── config.json
 ├── pc-sender.Tests/            # PC 側の単体テスト (xUnit)
@@ -166,7 +168,7 @@ bt-notify-relay/
         └── NotificationHelper.kt
 ```
 
-- **PC の通知元**: Windows のトースト通知 (FR-PC-03) は MSIX が必要なため未接続。代わりに Outlook / ICS の予定、自作リマインダー、クイックタイマーを送る
+- **PC の通知元**: Windows のトースト通知 (FR-PC-03) は MSIX が必要なため未接続。代わりに Outlook / ICS の予定、自作リマインダー、タイマー（定番の分数、または好きな分数とメモ）を送る
 - **静かな時間帯の設定名**: `quiet_hours` ではなく `quiet_hours_start` / `quiet_hours_end`
 - **接続先**: デバイス名の部分一致のみ (FR-PC-02 のアドレス指定、FR-PC-01 の「接続先デバイス選択」は未実装)
 - **キープアライブ**: PC は 30 秒ごとに ping を送り、pong が 75 秒返らなければ再接続する。どちらの側も ping を受けたら pong を返す

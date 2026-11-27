@@ -46,11 +46,15 @@ internal sealed class TrayContext : ApplicationContext
     private readonly NotifyIcon _tray;
     private readonly ToolStripMenuItem _statusItem;
     private readonly ToolStripMenuItem _scheduleItem;
+    private readonly ToolStripMenuItem _timerMenu;
+    private readonly TimerManager _timers;
     private readonly Dictionary<LinkState, Icon> _icons;
 
     private string _btStatus = "初期化中";
     private string _schedStatus = "予定: 読み込み中";
     private LinkState? _lastState;
+    private int _lastTimerMinutes = 10;
+    private bool _timerDialogOpen;
 
     public TrayContext()
     {
@@ -71,6 +75,8 @@ internal sealed class TrayContext : ApplicationContext
 
         _statusItem = new ToolStripMenuItem("BT: 初期化中") { Enabled = false };
         _scheduleItem = new ToolStripMenuItem(_schedStatus) { Enabled = false };
+        _timerMenu = new ToolStripMenuItem("タイマー");
+        _timerMenu.DropDownOpening += (_, _) => RebuildTimerMenu(); // 残り時間を開くたびに更新
 
         _tray = new NotifyIcon
         {
@@ -82,6 +88,17 @@ internal sealed class TrayContext : ApplicationContext
 
         _bt = new BluetoothClient(_config.TargetDeviceName);
         _bt.StatusChanged += (state, message) => _ui.Post(_ => OnLinkStatus(state, message), null);
+
+        _timers = new TimerManager(TimeProvider.System, async t =>
+        {
+            bool sent = await _bt.SendNotificationAsync(
+                $"timer-{t.Id}-{t.FireAt.ToUnixTimeSeconds()}", "PCタイマー", t.Title, t.Body(TimeZoneInfo.Local));
+            _ui.Post(_ => _tray.ShowBalloonTip(4000, $"タイマー: {t.Title}",
+                sent ? "バンドへ送りました" : "スマホと未接続のため保留しました（つながったら送ります）",
+                sent ? ToolTipIcon.Info : ToolTipIcon.Warning), null);
+        });
+        _timers.Changed += () => _ui.Post(_ => RefreshText(), null);
+        RebuildTimerMenu();
 
         _schedule = new ScheduleMonitor(_config, async (id, source, title, body) =>
         {
@@ -106,12 +123,7 @@ internal sealed class TrayContext : ApplicationContext
         menu.Items.Add(_scheduleItem);
         menu.Items.Add(new ToolStripSeparator());
 
-        var timerMenu = new ToolStripMenuItem("クイックタイマー");
-        timerMenu.DropDownItems.Add("5分後に通知", null, (_, _) => StartQuickTimer(5, "5分タイマー"));
-        timerMenu.DropDownItems.Add("15分後に通知", null, (_, _) => StartQuickTimer(15, "15分タイマー"));
-        timerMenu.DropDownItems.Add("25分後に通知 (ポモドーロ)", null, (_, _) => StartQuickTimer(25, "ポモドーロ25分"));
-        timerMenu.DropDownItems.Add("60分後に通知", null, (_, _) => StartQuickTimer(60, "60分タイマー"));
-        menu.Items.Add(timerMenu);
+        menu.Items.Add(_timerMenu);
 
         menu.Items.Add("テスト通知を送信", null, async (_, _) =>
         {
@@ -141,27 +153,89 @@ internal sealed class TrayContext : ApplicationContext
         });
         menu.Items.Add("設定を反映して再起動", null, (_, _) =>
         {
+            if (!ConfirmDropTimers("再起動する")) return;
             _tray.Visible = false;
             Application.Restart();
         });
-        menu.Items.Add("終了", null, (_, _) => ExitThread());
+        menu.Items.Add("終了", null, (_, _) =>
+        {
+            if (ConfirmDropTimers("終了する")) ExitThread();
+        });
         return menu;
     }
 
-    private void StartQuickTimer(int minutes, string label)
-    {
-        var fireAt = DateTime.Now.AddMinutes(minutes);
-        _tray.ShowBalloonTip(2000, "タイマー設定", $"{label} ({fireAt:HH:mm} にバンドへ通知)", ToolTipIcon.Info);
+    // --- タイマー ---
 
-        _ = Task.Run(async () =>
+    private static readonly (int Minutes, string Memo)[] QuickTimers = { (5, ""), (15, ""), (25, "ポモドーロ"), (60, "") };
+
+    private void RebuildTimerMenu()
+    {
+        var items = _timerMenu.DropDownItems;
+        items.Clear();
+        items.Add("時間を指定して開始...", null, (_, _) => _ui.Post(_ => ShowTimerDialog(), null));
+        items.Add(new ToolStripSeparator());
+        foreach (var (minutes, memo) in QuickTimers)
         {
-            await Task.Delay(TimeSpan.FromMinutes(minutes));
-            await _bt.SendNotificationAsync(
-                $"timer-{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
-                "PCタイマー",
-                $"{label} 経過",
-                $"{minutes}分タイマーが完了しました ({fireAt:HH:mm})");
-        });
+            string label = $"{TimerText.Duration(minutes)}後に通知" + (memo.Length > 0 ? $" ({memo})" : "");
+            items.Add(label, null, (_, _) => StartTimer(minutes, memo));
+        }
+
+        var active = _timers.Active;
+        if (active.Count == 0) return;
+        items.Add(new ToolStripSeparator());
+        items.Add(new ToolStripMenuItem("実行中（クリックで取り消し）") { Enabled = false });
+        var now = DateTimeOffset.Now;
+        foreach (var t in active)
+        {
+            string text = $"{FormatClock(t.FireAt)}  {t.Title}（あと{TimerText.Remaining(t.FireAt - now)}）";
+            items.Add(text, null, (_, _) =>
+            {
+                if (_timers.Cancel(t.Id))
+                    _tray.ShowBalloonTip(2000, "タイマーを取り消しました", $"{FormatClock(t.FireAt)}  {t.Title}", ToolTipIcon.Info);
+            });
+        }
+    }
+
+    private void ShowTimerDialog()
+    {
+        if (_timerDialogOpen) return;
+        _timerDialogOpen = true;
+        try
+        {
+            using var dialog = new TimerDialog(_lastTimerMinutes, "");
+            if (dialog.ShowDialog() != DialogResult.OK) return;
+            _lastTimerMinutes = dialog.Minutes;
+            StartTimer(dialog.Minutes, dialog.Memo);
+        }
+        finally
+        {
+            _timerDialogOpen = false;
+        }
+    }
+
+    private void StartTimer(int minutes, string memo)
+    {
+        var t = _timers.Start(minutes, memo);
+        string text = $"{FormatClock(t.FireAt)} にバンドへ通知します（{TimerText.Duration(minutes)}後）";
+        if (t.Memo.Length > 0) text += $"\nメモ: {t.Memo}";
+        if (!_bt.IsConnected) text += "\n今はスマホと未接続です（つながったら届きます）";
+        _tray.ShowBalloonTip(3000, "タイマー開始", text, ToolTipIcon.Info);
+    }
+
+    /// <summary>今日なら "10:45"、明日なら "明日 10:45"</summary>
+    private static string FormatClock(DateTimeOffset at)
+    {
+        var local = at.ToLocalTime().DateTime;
+        string day = local.Date == DateTime.Today ? "" : local.Date == DateTime.Today.AddDays(1) ? "明日 " : $"{local:M/d} ";
+        return $"{day}{local:HH:mm}";
+    }
+
+    private bool ConfirmDropTimers(string action)
+    {
+        int count = _timers.Active.Count;
+        if (count == 0) return true;
+        return MessageBox.Show($"実行中のタイマーが {count} 件あります。{action}とタイマーは消えます。続けますか？",
+            "BT Notify Relay", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes;
     }
 
     private void OnLinkStatus(LinkState state, string message)
@@ -183,6 +257,9 @@ internal sealed class TrayContext : ApplicationContext
         _statusItem.Text = $"BT: {_btStatus}";
         _scheduleItem.Text = _schedStatus;
         string text = $"BT Notify Relay\n{_btStatus}\n{_schedStatus}";
+        var timers = _timers.Active;
+        if (timers.Count > 0)
+            text += $"\nタイマー: {FormatClock(timers[0].FireAt)} {timers[0].Title}" + (timers.Count > 1 ? $" ほか{timers.Count - 1}件" : "");
         try
         {
             _tray.Text = text.Length > 127 ? text[..127] : text; // .NET 8 の上限は 127 文字
@@ -204,6 +281,7 @@ internal sealed class TrayContext : ApplicationContext
     {
         SystemEvents.PowerModeChanged -= OnPowerModeChanged;
         _tray.Visible = false;
+        _timers.Dispose();
         _schedule.Dispose();
         _bt.Dispose();
         _tray.Dispose();
