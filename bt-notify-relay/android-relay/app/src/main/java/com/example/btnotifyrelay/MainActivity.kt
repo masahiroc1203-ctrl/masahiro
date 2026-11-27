@@ -210,6 +210,9 @@ class MainActivity : AppCompatActivity() {
         if (!shown) {
             Toast.makeText(this, "通知がオフになっています。通知設定を開きます", Toast.LENGTH_LONG).show()
             openAppNotificationSettings()
+        } else if (!BtRelayService.isRunning) {
+            // 先にテスト通知だけ押すと「付近のデバイス」が未許可のまま、サービスも止まったままになりやすい
+            Toast.makeText(this, "テスト通知を出しました。PC とつなぐには「サービス開始」も押してください", Toast.LENGTH_LONG).show()
         }
     }
 
