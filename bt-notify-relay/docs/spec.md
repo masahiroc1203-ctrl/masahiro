@@ -135,3 +135,39 @@ bt-notify-relay/
   - Android の `BtRelayService` と PC の `BluetoothClient` を実装し、PC から送ったテスト JSON が Android 通知経由でスマートバンドに届くことを確認する。
 3. **Phase 3: PC 側通知フックと自動再接続**
   - `NotificationWatcher` と `config.json` によるアプリフィルタリング、およびスリープ復帰時の自動再接続処理を実装する。
+
+---
+
+## 8. 実装メモ（2026-11-27 追記。ここより上は Gemini で作成した仕様のまま）
+
+実際のフォルダ構成と、上の仕様との違い。詳しくは `../README.md` の「Gemini 版からの変更点」。
+
+```text
+bt-notify-relay/
+├── README.md                   # 試し方・設定・トラブル対処
+├── docs/spec.md                # 本仕様書
+├── pc-sender/                  # Windows C# (.NET 8) トレイ常駐アプリ
+│   ├── Program.cs              # エントリポイント・タスクトレイ制御
+│   ├── AppConfig.cs            # config.json の読み込み
+│   ├── Protocol.cs             # 通信形式 (1行1JSON)
+│   ├── BluetoothClient.cs      # RFCOMM 接続・再接続・ping/pong・送信の保留
+│   ├── ScheduleMonitor.cs      # 予定・リマインダーの監視
+│   ├── OutlookCalendar.cs      # クラシック版 Outlook (COM) から予定取得
+│   ├── IcsParser.cs            # ICS の読み取り
+│   ├── ReminderClock.cs        # 時刻計算 (静かな時間帯・曜日)
+│   ├── NotificationWatcher.cs  # Windows 通知の監視 (MSIX 化するまで未使用)
+│   └── config.json
+├── pc-sender.Tests/            # PC 側の単体テスト (xUnit)
+└── android-relay/              # Android Kotlin プロジェクト (Gradle)
+    └── app/src/main/java/com/example/btnotifyrelay/
+        ├── MainActivity.kt
+        ├── BtRelayService.kt
+        ├── RelayProtocol.kt    # 通信形式 (単体テスト対象)
+        └── NotificationHelper.kt
+```
+
+- **PC の通知元**: Windows のトースト通知 (FR-PC-03) は MSIX が必要なため未接続。代わりに Outlook / ICS の予定、自作リマインダー、クイックタイマーを送る
+- **静かな時間帯の設定名**: `quiet_hours` ではなく `quiet_hours_start` / `quiet_hours_end`
+- **接続先**: デバイス名の部分一致のみ (FR-PC-02 のアドレス指定、FR-PC-01 の「接続先デバイス選択」は未実装)
+- **キープアライブ**: PC は 30 秒ごとに ping を送り、pong が 75 秒返らなければ再接続する。どちらの側も ping を受けたら pong を返す
+- **Android**: UI は Jetpack Compose ではなく View。Target SDK は 35。サーバーソケットは開いたままにし、新しい接続が来たら古い接続を閉じる

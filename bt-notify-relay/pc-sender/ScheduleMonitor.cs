@@ -1,22 +1,25 @@
-using System.Globalization;
-using System.Runtime.InteropServices;
-using System.Text.RegularExpressions;
-
 namespace BtNotifySender;
 
-public record CalendarEventItem(string UniqueId, string Source, string Title, DateTime StartLocal, string Location);
-
-public class ScheduleMonitor : IDisposable
+/// <summary>
+/// Outlook / ICS の予定と、自作リマインダーを監視して、時刻が来たら通知を送る。
+/// </summary>
+public sealed class ScheduleMonitor : IDisposable
 {
+    private static readonly TimeSpan CheckInterval = TimeSpan.FromSeconds(20);
+    private static readonly TimeSpan RefreshInterval = TimeSpan.FromMinutes(5);
+
     private readonly AppConfig _config;
     private readonly Func<string, string, string, string, Task> _onNotify;
     private readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(10) };
-    private readonly HashSet<string> _firedKeys = new();
+    private readonly Dictionary<string, DateTime> _firedKeys = new(); // キー → 発火予定時刻 (古いものは捨てる)
+    private readonly SemaphoreSlim _refreshLock = new(1, 1);
     private readonly CancellationTokenSource _cts = new();
-    private List<CalendarEventItem> _cachedEvents = new();
+    private volatile IReadOnlyList<CalendarEventItem> _cachedEvents = Array.Empty<CalendarEventItem>();
     private DateTime _lastFetchUtc = DateTime.MinValue;
+    private DateTime _lastCheck = DateTime.Now;
 
     public event Action<string>? StatusChanged;
+    public string LastStatus { get; private set; } = "予定: 読み込み中";
 
     public ScheduleMonitor(AppConfig config, Func<string, string, string, string, Task> onNotify)
     {
@@ -25,11 +28,8 @@ public class ScheduleMonitor : IDisposable
         _ = Task.Run(() => MonitorLoopAsync(_cts.Token));
     }
 
-    public async Task ForceReloadAsync()
-    {
-        _lastFetchUtc = DateTime.MinValue;
-        await RefreshEventsIfNeededAsync(force: true);
-    }
+    /// <summary>予定を今すぐ読み直す。結果の状態文字列を返す</summary>
+    public Task<string> ForceReloadAsync() => Task.Run(() => RefreshEventsAsync(force: true));
 
     private async Task MonitorLoopAsync(CancellationToken token)
     {
@@ -37,256 +37,145 @@ public class ScheduleMonitor : IDisposable
         {
             try
             {
-                if (!IsQuietHours())
+                var now = DateTime.Now;
+                var from = ReminderClock.ClampWindowStart(_lastCheck, now);
+                _lastCheck = now; // 静かな時間帯の間も進めるので、明けたときにまとめて鳴らない
+
+                if (!ReminderClock.IsQuietHours(now, _config.QuietHoursStart, _config.QuietHoursEnd))
                 {
-                    await RefreshEventsIfNeededAsync(force: false);
-                    await CheckCalendarRemindersAsync();
-                    await CheckCustomRemindersAsync();
+                    await RefreshEventsAsync(force: false);
+                    await CheckCalendarRemindersAsync(from, now);
+                    await CheckCustomRemindersAsync(from, now);
                 }
+                PruneFiredKeys(now);
             }
             catch (Exception ex)
             {
-                StatusChanged?.Invoke($"監視エラー: {ex.Message}");
+                Report($"予定: 監視エラー ({ex.Message})");
             }
 
-            await Task.Delay(TimeSpan.FromSeconds(30), token);
+            try { await Task.Delay(CheckInterval, token); }
+            catch (OperationCanceledException) { return; }
         }
     }
 
-    private async Task RefreshEventsIfNeededAsync(bool force)
+    private async Task<string> RefreshEventsAsync(bool force)
     {
-        // カレンダーの再取得は5分間隔（ForceReload時は即時）
-        if (!force && (DateTime.UtcNow - _lastFetchUtc) < TimeSpan.FromMinutes(5))
-            return;
-
-        var list = new List<CalendarEventItem>();
-
-        if (_config.EnableOutlookCom)
+        await _refreshLock.WaitAsync();
+        try
         {
-            list.AddRange(FetchFromClassicOutlook());
-        }
+            if (!force && DateTime.UtcNow - _lastFetchUtc < RefreshInterval)
+                return LastStatus;
 
-        foreach (var src in _config.IcsSources.Where(s => !string.IsNullOrWhiteSpace(s)))
+            var from = DateTime.Today;
+            var to = DateTime.Today.AddDays(2);
+            var list = new List<CalendarEventItem>();
+            var parts = new List<string>();
+
+            if (_config.EnableOutlookCom)
+            {
+                list.AddRange(OutlookCalendar.Fetch(from, to, out var outlookStatus));
+                parts.Add(outlookStatus);
+            }
+
+            int icsOk = 0, icsCount = 0;
+            var icsErrors = new List<string>();
+            foreach (var src in _config.IcsSources.Where(s => !string.IsNullOrWhiteSpace(s)))
+            {
+                try
+                {
+                    var events = IcsParser.Parse(await ReadIcsAsync(src.Trim()), from, to);
+                    list.AddRange(events);
+                    icsCount += events.Count;
+                    icsOk++;
+                }
+                catch (Exception ex)
+                {
+                    icsErrors.Add(ex.Message);
+                }
+            }
+            if (_config.IcsSources.Count > 0)
+                parts.Add(icsErrors.Count == 0 ? $"ICS: {icsCount}件" : $"ICS: {icsCount}件 / 失敗{icsErrors.Count} ({icsErrors[0]})");
+
+            _cachedEvents = list;
+            _lastFetchUtc = DateTime.UtcNow;
+            int upcoming = list.Count(e => e.StartLocal >= DateTime.Now);
+            Report($"予定: これから{upcoming}件" + (parts.Count > 0 ? $" ({string.Join(" / ", parts)})" : ""));
+            return LastStatus;
+        }
+        finally
         {
-            var icsEvents = await FetchFromIcsAsync(src.Trim());
-            list.AddRange(icsEvents);
+            _refreshLock.Release();
         }
-
-        _cachedEvents = list;
-        _lastFetchUtc = DateTime.UtcNow;
-        StatusChanged?.Invoke($"予定監視中 ({_cachedEvents.Count}件)");
     }
 
-    private async Task CheckCalendarRemindersAsync()
+    private async Task<string> ReadIcsAsync(string source)
     {
-        var now = DateTime.Now;
+        if (source.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+            source.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            return await _httpClient.GetStringAsync(source);
+        }
+        if (source.StartsWith("webcal://", StringComparison.OrdinalIgnoreCase))
+        {
+            return await _httpClient.GetStringAsync("https://" + source["webcal://".Length..]);
+        }
+        var path = Environment.ExpandEnvironmentVariables(source);
+        if (!File.Exists(path)) throw new FileNotFoundException($"ファイルがありません: {path}");
+        return await File.ReadAllTextAsync(path);
+    }
+
+    private async Task CheckCalendarRemindersAsync(DateTime from, DateTime now)
+    {
         var offsets = _config.ReminderMinutesBefore.Count > 0
-            ? _config.ReminderMinutesBefore
+            ? _config.ReminderMinutesBefore.Distinct().ToList()
             : new List<int> { 5, 0 };
 
         foreach (var ev in _cachedEvents)
         {
-            double diffMinutes = (ev.StartLocal - now).TotalMinutes;
-
             foreach (int minBefore in offsets)
             {
-                // 指定分前の前後45秒ウィンドウに入ったら発火
-                if (diffMinutes <= minBefore && diffMinutes > minBefore - 0.75)
-                {
-                    string fireKey = $"{ev.UniqueId}_{ev.StartLocal:yyyyMMddHHmm}_{minBefore}";
-                    if (_firedKeys.Add(fireKey))
-                    {
-                        string prefix = minBefore == 0 ? "開始時刻" : $"{minBefore}分前";
-                        string title = $"{ev.Title} ({prefix})";
-                        string body = string.IsNullOrWhiteSpace(ev.Location)
-                            ? $"{ev.StartLocal:HH:mm} 開始"
-                            : $"{ev.StartLocal:HH:mm} 開始 / 場所: {ev.Location}";
+                var due = ev.StartLocal.AddMinutes(-minBefore);
+                if (!ReminderClock.IsDue(due, from, now)) continue;
 
-                        await _onNotify(fireKey, ev.Source, title, body);
-                    }
-                }
+                string fireKey = $"{ev.Source}_{ev.UniqueId}_{ev.StartLocal:yyyyMMddHHmm}_{minBefore}";
+                if (!_firedKeys.TryAdd(fireKey, due)) continue;
+
+                string prefix = minBefore == 0 ? "開始時刻" : $"{minBefore}分前";
+                string title = $"{ev.Title} ({prefix})";
+                string body = string.IsNullOrWhiteSpace(ev.Location)
+                    ? $"{ev.StartLocal:HH:mm} 開始"
+                    : $"{ev.StartLocal:HH:mm} 開始 / 場所: {ev.Location}";
+
+                await _onNotify(fireKey, ev.Source, title, body);
             }
         }
     }
 
-    private async Task CheckCustomRemindersAsync()
+    private async Task CheckCustomRemindersAsync(DateTime from, DateTime now)
     {
-        var now = DateTime.Now;
-        string todayShort = now.DayOfWeek.ToString()[..3]; // "Mon", "Tue"...
-        string currentHm = now.ToString("HH:mm");
-
-        foreach (var rem in _config.CustomReminders)
+        for (int i = 0; i < _config.CustomReminders.Count; i++)
         {
-            if (rem.Days.Count > 0 &&
-                !rem.Days.Any(d => d.StartsWith(todayShort, StringComparison.OrdinalIgnoreCase)))
+            var rem = _config.CustomReminders[i];
+            foreach (var due in ReminderClock.CustomReminderDueTimes(rem, from, now))
             {
-                continue;
-            }
-
-            if (rem.Time == currentHm)
-            {
-                string fireKey = $"custom_{rem.Title}_{now:yyyyMMddHHmm}";
-                if (_firedKeys.Add(fireKey))
-                {
+                string fireKey = $"custom_{i}_{due:yyyyMMddHHmm}";
+                if (_firedKeys.TryAdd(fireKey, due))
                     await _onNotify(fireKey, "リマインダー", rem.Title, rem.Body);
-                }
             }
         }
     }
 
-    // --- クラシック版 Outlook COM からの予定取得 ---
-    private static List<CalendarEventItem> FetchFromClassicOutlook()
+    private void PruneFiredKeys(DateTime now)
     {
-        var results = new List<CalendarEventItem>();
-        try
-        {
-            var outlookType = Type.GetTypeFromProgID("Outlook.Application");
-            if (outlookType == null) return results;
-
-            dynamic? outlookApp = null;
-            try
-            {
-                outlookApp = Marshal.GetActiveObject("Outlook.Application");
-            }
-            catch
-            {
-                // Outlook未起動時はバックグラウンド起動を避けてスキップ
-                return results;
-            }
-
-            if (outlookApp == null) return results;
-
-            dynamic ns = outlookApp.GetNamespace("MAPI");
-            dynamic calendar = ns.GetDefaultFolder(9); // 9 = olFolderCalendar
-            dynamic items = calendar.Items;
-            items.IncludeRecurrences = true;
-            items.Sort("[Start]");
-
-            DateTime startRange = DateTime.Today;
-            DateTime endRange = DateTime.Today.AddDays(2);
-            string filter = $"[Start] >= '{startRange:g}' AND [Start] <= '{endRange:g}'";
-            dynamic restricted = items.Restrict(filter);
-
-            foreach (dynamic appt in restricted)
-            {
-                try
-                {
-                    string subject = appt.Subject ?? "(無題の予定)";
-                    DateTime start = appt.Start;
-                    string location = appt.Location ?? "";
-                    string entryId = appt.EntryID ?? subject;
-                    results.Add(new CalendarEventItem(entryId, "Outlook", subject, start, location));
-                }
-                catch { }
-            }
-        }
-        catch
-        {
-            // 新しいOutlookやCOM制限環境では無視
-        }
-        return results;
+        foreach (var key in _firedKeys.Where(kv => kv.Value < now.AddDays(-1)).Select(kv => kv.Key).ToList())
+            _firedKeys.Remove(key);
     }
 
-    // --- ICS ファイル / URL パーサー ---
-    private async Task<List<CalendarEventItem>> FetchFromIcsAsync(string source)
+    private void Report(string status)
     {
-        var results = new List<CalendarEventItem>();
-        try
-        {
-            string raw = source.StartsWith("http", StringComparison.OrdinalIgnoreCase)
-                ? await _httpClient.GetStringAsync(source)
-                : File.Exists(source) ? await File.ReadAllTextAsync(source) : "";
-
-            if (string.IsNullOrWhiteSpace(raw)) return results;
-
-            // RFC5545 の行折り返し（CRLF + 空白）を解除
-            string unfolded = Regex.Replace(raw, @"\r?\n[ \t]", "");
-            var lines = unfolded.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
-
-            bool inEvent = false;
-            string uid = "", summary = "", location = "", dtStartRaw = "";
-
-            foreach (var line in lines)
-            {
-                if (line == "BEGIN:VEVENT")
-                {
-                    inEvent = true;
-                    uid = ""; summary = ""; location = ""; dtStartRaw = "";
-                }
-                else if (line == "END:VEVENT" && inEvent)
-                {
-                    inEvent = false;
-                    if (TryParseIcsDateTime(dtStartRaw, out var startLocal))
-                    {
-                        // 今日〜明日までの予定のみ保持
-                        if (startLocal >= DateTime.Today && startLocal <= DateTime.Today.AddDays(2))
-                        {
-                            string id = string.IsNullOrEmpty(uid) ? $"{summary}_{startLocal:ticks}" : uid;
-                            results.Add(new CalendarEventItem(
-                                id,
-                                "カレンダー",
-                                string.IsNullOrEmpty(summary) ? "(無題)" : UnescapeIcsText(summary),
-                                startLocal,
-                                UnescapeIcsText(location)));
-                        }
-                    }
-                }
-                else if (inEvent)
-                {
-                    int colonIdx = line.IndexOf(':');
-                    if (colonIdx <= 0) continue;
-
-                    string prop = line[..colonIdx];
-                    string val = line[(colonIdx + 1)..];
-
-                    if (prop.StartsWith("UID")) uid = val;
-                    else if (prop.StartsWith("SUMMARY")) summary = val;
-                    else if (prop.StartsWith("LOCATION")) location = val;
-                    else if (prop.StartsWith("DTSTART")) dtStartRaw = val;
-                }
-            }
-        }
-        catch { }
-        return results;
-    }
-
-    private static bool TryParseIcsDateTime(string raw, out DateTime localTime)
-    {
-        localTime = default;
-        if (string.IsNullOrWhiteSpace(raw)) return false;
-
-        // UTC形式 (例: 20261127T063000Z)
-        if (raw.EndsWith("Z") && DateTime.TryParseExact(
-            raw, "yyyyMMdd'T'HHmmss'Z'", CultureInfo.InvariantCulture,
-            DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var utc))
-        {
-            localTime = utc.ToLocalTime();
-            return true;
-        }
-
-        // ローカル日時形式 (例: 20261127T153000)
-        if (DateTime.TryParseExact(
-            raw, "yyyyMMdd'T'HHmmss", CultureInfo.InvariantCulture,
-            DateTimeStyles.AssumeLocal, out var local))
-        {
-            localTime = local;
-            return true;
-        }
-
-        return false;
-    }
-
-    private static string UnescapeIcsText(string text) =>
-        text.Replace("\\n", " ").Replace("\\,", ",").Replace("\\;", ";").Replace("\\\\", "\\");
-
-    private bool IsQuietHours()
-    {
-        if (!TimeSpan.TryParse(_config.QuietHoursStart, out var start) ||
-            !TimeSpan.TryParse(_config.QuietHoursEnd, out var end))
-            return false;
-
-        var now = DateTime.Now.TimeOfDay;
-        return start <= end ? (now >= start && now <= end) : (now >= start || now <= end);
+        LastStatus = status;
+        StatusChanged?.Invoke(status);
     }
 
     public void Dispose()

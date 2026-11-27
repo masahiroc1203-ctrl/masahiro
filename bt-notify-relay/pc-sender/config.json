@@ -1,9 +1,7 @@
 {
-  "target_device_name": "Galaxy",
+  "target_device_name": "S25",
   "enable_outlook_com": true,
-  "ics_sources": [
-    "C:\\Users\\YourName\\Downloads\\calendar.ics"
-  ],
+  "ics_sources": [],
   "reminder_minutes_before": [10, 5, 0],
   "custom_reminders": [
     {
