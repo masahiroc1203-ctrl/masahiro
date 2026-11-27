@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Claude Code が保存した引き継ぎ (.handoff/HANDOFF.md) を渡して Gemini CLI を起動する。
+#   使い方: gemini-resume [プロジェクトのディレクトリ] [gemini に渡す追加オプション...]
+set -euo pipefail
+
+dir="$PWD"
+if [ $# -gt 0 ] && [ -d "$1" ]; then dir="$1"; shift; fi
+root="$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null || (cd "$dir" && pwd))"
+file="$root/.handoff/HANDOFF.md"
+
+if [ ! -f "$file" ]; then
+  echo "引き継ぎファイルがありません: $file" >&2
+  echo "Claude Code で /handoff を実行すると作成できます。" >&2
+  exit 1
+fi
+if ! command -v gemini >/dev/null 2>&1; then
+  echo "gemini CLI が見つかりません。インストール: npm install -g @google/gemini-cli" >&2
+  echo "Gemini の Web 版を使う場合は、このファイルを添付してください: $file" >&2
+  exit 1
+fi
+
+cd "$root"
+prompt="Claude Code からの作業の引き継ぎです。以下の資料 (.handoff/HANDOFF.md の内容) を読み、
+まず現状を 3 行で要約して、私に確認してから「次にやること」の続きに取りかかってください。
+作業の区切りごとに .handoff/HANDOFF.md の「3. Gemini 作業ログ」へ、やったこと・残っていることを追記してください。
+
+----- ここから引き継ぎ資料 -----
+$(cat "$file")"
+
+exec gemini "$@" -i "$prompt"
