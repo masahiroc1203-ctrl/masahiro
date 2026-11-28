@@ -38,6 +38,9 @@ CONFIG = [
 
     # --- 温度 ---
     ("set", "BED_MAXTEMP", "125"),
+    ("set", "DEFAULT_KP", "21.73"),                          # Creality の初期値。M303 で取り直す
+    ("set", "DEFAULT_KI", "1.54"),
+    ("set", "DEFAULT_KD", "76.55"),
     ("on", "PID_EDIT_MENU"),
     ("on", "PID_AUTOTUNE_MENU"),
     ("set", "TEMP_BED_WINDOW", "2"),
@@ -56,6 +59,7 @@ CONFIG = [
     ("set", "INVERT_E0_DIR", "true"),                        # Sprite はダイレクトで逆回転（実機確認）
     ("set", "HOMING_FEEDRATE_MM_M", "{ (40*60), (40*60), (6*60) }"),
     ("on", "NO_MOTION_BEFORE_HOMING"),
+    ("on", "HOME_AFTER_DEACTIVATE"),                         # モーター解放後は原点を取り直させる
 
     # --- 造形範囲（実測 220 x 220 x 245）---
     ("set", "X_BED_SIZE", "220"),
@@ -104,6 +108,9 @@ CONFIG = [
     ("set", "PREHEAT_2_TEMP_HOTEND", "235"),
     ("set", "PREHEAT_2_TEMP_BED", "80"),
     ("on", "SDSUPPORT"),
+    ("on", "SD_CHECK_AND_RETRY"),
+    ("set", "ENCODER_STEPS_PER_MENU_ITEM", "2"),             # 以前の設定と同じノブの送り
+    ("on", "ENCODER_NOISE_FILTER"),
     ("on", "CR10_STOCKDISPLAY"),
     ("add_after", "CR10_STOCKDISPLAY",
      "  #define RET6_12864_LCD   // 4.2.7 は多くが RET6。画面が映らない/化けるなら VET6_12864_LCD"),

@@ -23,6 +23,7 @@
 | `tools/apply_config.py` | 素の Marlin 2.1.3 設定から、このハード用の設定を作るスクリプト。**変更点はすべてこの中の一覧にある** |
 | `config/Configuration.h` / `config/Configuration_adv.h` | 上のスクリプトで作った設定（Marlin の `Marlin/` フォルダにそのまま置く） |
 | `CALIBRATION.md` | 書き込みと実機調整の手順 |
+| `CHANGES_FROM_OLD.md` | 以前の設定からの変更点 |
 | `gcode/` | スライサーの開始・終了Gコードと OctoPrint のキャンセル後スクリプト |
 
 ### 作り直し方
