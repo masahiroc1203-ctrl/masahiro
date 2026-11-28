@@ -1,0 +1,50 @@
+name: Ender-3 Pro firmware build
+
+on:
+  push:
+    paths:
+      - 'ender3-firmware/**'
+      - '.github/workflows/ender3-firmware.yml'
+  pull_request:
+    paths:
+      - 'ender3-firmware/**'
+      - '.github/workflows/ender3-firmware.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      MARLIN_TAG: '2.1.3'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch official Marlin
+        run: git clone --depth 1 --branch "$MARLIN_TAG" https://github.com/MarlinFirmware/Marlin marlin
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Generate config and check it matches the committed copy
+        run: |
+          python3 ender3-firmware/tools/apply_config.py marlin/Marlin generated
+          diff -u ender3-firmware/config/Configuration.h generated/Configuration.h
+          diff -u ender3-firmware/config/Configuration_adv.h generated/Configuration_adv.h
+          cp generated/Configuration*.h marlin/Marlin/
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: ${{ runner.os }}-pio-${{ env.MARLIN_TAG }}
+
+      - name: Build
+        run: |
+          pip install platformio
+          cd marlin && pio run -e STM32F103RE_creality
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ender3-firmware-${{ github.sha }}
+          path: marlin/.pio/build/STM32F103RE_creality/firmware-*.bin
+          retention-days: 30
