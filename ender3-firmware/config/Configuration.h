@@ -3284,7 +3284,6 @@
 //
 #define CR10_STOCKDISPLAY
   #define RET6_12864_LCD   // 4.2.7 は多くが RET6。画面が映らない/化けるなら VET6_12864_LCD
-  #define RET6_12864_LCD   // 4.2.7 は多くが RET6。画面が映らない/化けるなら VET6_12864_LCD
 
 //
 // Ender-2 OEM display, a variant of the MKS_MINI_12864
